@@ -11,6 +11,7 @@ test {
     _ = @import("collect_urls.zig");
     _ = @import("check_http.zig");
     _ = @import("check_link_list.zig");
+    _ = @import("TableFormatter.zig");
     _ = @import("table_view.zig");
     _ = @import("export_csv.zig");
     _ = @import("check_links_by_page.zig");
