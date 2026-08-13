@@ -15,5 +15,6 @@ test {
     _ = @import("table_view.zig");
     _ = @import("export_csv.zig");
     _ = @import("check_links_by_page.zig");
+    _ = @import("bar.zig");
     _ = @import("http_integration_test.zig");
 }

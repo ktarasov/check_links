@@ -6,7 +6,7 @@
 
 const std = @import("std");
 const check_http = @import("check_http.zig");
-const TestingProgress = @import("testing_progress.zig");
+const Bar = @import("bar.zig").Bar;
 
 /// Размер чанка для пакетной обработки URL.
 pub const chunk_size: usize = 10;
@@ -46,15 +46,20 @@ pub fn checkLinkList(
     io: std.Io,
     allocator: std.mem.Allocator,
     url_list: []const []const u8,
-    progress: anytype, // Сюда передается std.Progress.Node, но для целей тестирования нужно передать TestingProgress.
+    writer: ?*std.Io.Writer,
 ) !CheckedList {
     var result = CheckedList.init(allocator);
     errdefer result.deinit();
 
-    const chunk_count = std.math.divCeil(usize, url_list.len, chunk_size) catch 0;
-
-    const progress_node = progress.start("Проверка URL-адресов по группам", chunk_count);
-    defer progress_node.end();
+    // создадим прогресс-бар
+    var progress_bar = try Bar.init(
+        allocator,
+        io,
+        @floatFromInt(url_list.len),
+        "Обработка: [:bar] - :current/:total - :percent% - Прошло::elapseds - Оценка::etas - Скорость::rate/s",
+        writer,
+    );
+    defer progress_bar.deinit();
 
     // Разбиваем список на чанки.
     var start: usize = 0;
@@ -62,14 +67,14 @@ pub fn checkLinkList(
         const end = @min(start + chunk_size, url_list.len);
         const chunk = url_list[start..end];
 
-        var check_results = try check_http.checkHttpCodes(io, allocator, chunk, progress_node);
+        var check_results = try check_http.checkHttpCodes(io, allocator, chunk);
         defer check_results.deinit(allocator);
 
         for (check_results.items) |check_result| {
             try addToGroup(&result, allocator, check_result.http_code, check_result.url);
         }
 
-        progress_node.completeOne();
+        progress_bar.tick(@floatFromInt(chunk.len));
     }
 
     return result;
@@ -99,7 +104,7 @@ fn addToGroup(
 
 test "checkLinkList: пустой список возвращает пустой результат" {
     const allocator = std.testing.allocator;
-    var result = try checkLinkList(std.testing.io, allocator, &.{}, TestingProgress{});
+    var result = try checkLinkList(std.testing.io, allocator, &.{}, null);
     defer result.deinit();
     try std.testing.expectEqual(@as(usize, 0), result.groups.items.len);
 }

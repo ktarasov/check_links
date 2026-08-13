@@ -6,7 +6,6 @@
 //! `CheckHttpCodeByUrlList`.
 
 const std = @import("std");
-const TestingProgress = @import("testing_progress.zig");
 
 /// Таймаут ожидания ответа от сервера в секундах.
 pub const timeout_seconds: u64 = 30;
@@ -28,7 +27,6 @@ pub fn checkHttpCodes(
     io: std.Io,
     allocator: std.mem.Allocator,
     url_list: []const []const u8,
-    progress: anytype, // Сюда передается std.Progress.Node, но для целей тестирования нужно передать TestingProgress.
 ) !std.ArrayList(ResolveUrlResult) {
     var result = std.ArrayList(ResolveUrlResult).empty;
     errdefer result.deinit(allocator);
@@ -50,12 +48,6 @@ pub fn checkHttpCodes(
     // Запускаем по одному потоку на каждый URL.
     for (url_list) |url| {
         if (url.len == 0) continue;
-
-        const progress_title = try std.fmt.allocPrint(allocator, "Проверка URL-адреса: {s}", .{url});
-        defer allocator.free(progress_title);
-
-        const progress_node_by_url = progress.start(progress_title, 1);
-        defer progress_node_by_url.end();
 
         const thread = std.Thread.spawn(.{}, worker, .{ &shared, url }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -124,14 +116,14 @@ fn checkOneUrl(
 
 test "checkHttpCodes: пустой список возвращает пустой результат" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, &.{}, TestingProgress{});
+    var result = try checkHttpCodes(std.testing.io, allocator, &.{});
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }
 
 test "checkHttpCodes: пропускает пустые строки" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, &.{ "", "", "" }, TestingProgress{});
+    var result = try checkHttpCodes(std.testing.io, allocator, &.{ "", "", "" });
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }

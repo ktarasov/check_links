@@ -29,18 +29,8 @@ pub fn run(
     allocator: std.mem.Allocator,
     options: Options,
 ) u8 {
-    // 0. Создание заголовка прогресс-бара.
-    const parent_title = std.fmt.allocPrint(allocator, "Проверка ссылок на странице {s}", .{options.url}) catch options.url;
-    defer allocator.free(parent_title);
-
-    // 0.1. Создание прогресс-бара.
-    const parent_progress_node = std.Progress.start(io, .{
-        .root_name = parent_title,
-    });
-    defer parent_progress_node.end();
-
     // 1. Сбор всех URL с указанной страницы.
-    var url_list = collect_urls.collectUrls(io, allocator, options.url, parent_progress_node) catch |err| {
+    var url_list = collect_urls.collectUrls(io, allocator, options.url) catch |err| {
         switch (err) {
             error.LoadFailed => printError(io, "Ошибка при загрузке страницы: {s}", .{options.url}),
             error.InvalidUrl => printError(io, "Некорректный URL: {s}", .{options.url}),
@@ -59,14 +49,17 @@ pub fn run(
         return 0;
     }
 
-    // 3. Проверка каждого URL.
-    var checked_list = check_link_list.checkLinkList(io, allocator, url_list.items, parent_progress_node) catch {
+    // 3. Подготовка Writer для прогресс-бара
+    var stderr_writer = std.Io.File.stderr().writer(io, &.{});
+
+    // 4. Проверка каждого URL.
+    var checked_list = check_link_list.checkLinkList(io, allocator, url_list.items, &stderr_writer.interface) catch {
         printError(io, "Ошибка при проверке ссылок", .{});
         return 1;
     };
     defer checked_list.deinit();
 
-    // 4. Вывод результатов.
+    // 5. Вывод результатов.
     if (options.export_filename) |file_name| {
         export_csv.exportCsv(io, allocator, options.url, &checked_list, options.fail, file_name) catch |err| {
             printError(io, "Ошибка при экспорте в CSV: {s}", .{@errorName(err)});

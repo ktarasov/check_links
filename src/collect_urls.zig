@@ -8,7 +8,6 @@
 const std = @import("std");
 const url_normalize = @import("url_normalize.zig");
 const html_parser = @import("html_parser.zig");
-const TestingProgress = @import("testing_progress.zig");
 
 /// Ошибка загрузки документа по URL.
 pub const GetDocumentError = error{
@@ -27,32 +26,18 @@ pub fn collectUrls(
     io: std.Io,
     allocator: std.mem.Allocator,
     url: []const u8,
-    progress: anytype, // Сюда передается std.Progress.Node, но для целей тестирования нужно передать TestingProgress.
 ) !std.ArrayList([]const u8) {
     const domain_url = try url_normalize.makeDomainUrl(allocator, url);
     defer allocator.free(domain_url);
 
-    var html: []u8 = undefined;
-    var parsed: html_parser.ParseResult = undefined;
-    {
-        const progress_node = progress.start("Сбор URL-адресов", 0);
-        defer progress_node.end();
+    const html = try loadDocument(io, allocator, url);
+    defer allocator.free(html);
 
-        html = try loadDocument(io, allocator, url);
-
-        progress_node.setName("Парисинг HTML-документа");
-        parsed = try html_parser.parse(allocator, html);
-    }
-    defer {
-        if (html.len > 0) allocator.free(html);
-        parsed.deinit();
-    }
+    var parsed = try html_parser.parse(allocator, html);
+    defer parsed.deinit();
 
     var result = std.ArrayList([]const u8).empty;
     errdefer result.deinit(allocator);
-
-    const progress_node = progress.start("Нормализация URL-адресов", parsed.len());
-    defer progress_node.end();
 
     // Собираем URL из тегов <a> и <img>.
     var parsed_it = parsed.iterator();
@@ -62,7 +47,6 @@ pub fn collectUrls(
                 allocator.free(normalized);
             }
         }
-        progress_node.completeOne();
     }
 
     return result;
@@ -177,7 +161,6 @@ test "collectUrls: извлекает URL из HTML-строки" {
         std.testing.io,
         allocator,
         file_url,
-        TestingProgress{},
     );
     defer {
         for (result.items) |item| allocator.free(item);
@@ -213,7 +196,6 @@ test "collectUrls: дедупликация URL" {
         std.testing.io,
         allocator,
         file_url,
-        TestingProgress{},
     );
     defer {
         for (result.items) |item| allocator.free(item);
@@ -241,7 +223,6 @@ test "collectUrls: пустая страница возвращает пусто
         std.testing.io,
         allocator,
         file_url,
-        TestingProgress{},
     );
     defer result.deinit(allocator);
 
@@ -256,7 +237,6 @@ test "collectUrls: несуществующий файл возвращает о
         std.testing.io,
         allocator,
         file_url,
-        TestingProgress{},
     ));
 }
 
@@ -266,6 +246,5 @@ test "collectUrls: невалидный URL возвращает ошибку" {
         std.testing.io,
         allocator,
         "not a url",
-        TestingProgress{},
     ));
 }

@@ -7,7 +7,6 @@
 const std = @import("std");
 const check_http = @import("check_http.zig");
 const check_link_list = @import("check_link_list.zig");
-const TestingProgress = @import("testing_progress.zig");
 
 const net = std.Io.net;
 const http = std.http;
@@ -122,7 +121,7 @@ test "HTTP: сервер отвечает 200" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, &.{url}, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{url});
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -146,7 +145,7 @@ test "HTTP: сервер отвечает 404" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, &.{url}, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{url});
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -169,7 +168,7 @@ test "HTTP: сервер отвечает 500" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, &.{url}, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{url});
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -192,7 +191,7 @@ test "HTTP: сервер отвечает редиректом 301" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, &.{url}, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{url});
     defer result.deinit(allocator);
 
     // Редиректы не проходятся — возвращается код первого ответа.
@@ -217,7 +216,7 @@ test "HTTP: пустые URL пропускаются" {
     defer thread.join();
 
     // Пустые строки должны быть пропущены, проверяется только непустой URL.
-    var result = try check_http.checkHttpCodes(io, allocator, &.{ "", url, "" }, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{ "", url, "" });
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -241,7 +240,7 @@ test "HTTP: дубликаты URL проверяются каждый" {
     const thread = try std.Thread.spawn(.{}, serveTwoThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, &.{ url, url }, TestingProgress{});
+    var result = try check_http.checkHttpCodes(io, allocator, &.{ url, url });
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.items.len);
@@ -277,7 +276,7 @@ test "HTTP: checkLinkList группирует разные статусы" {
         io,
         allocator,
         &.{ ok_url, missing_url, error_url, redirect_url },
-        TestingProgress{},
+        null,
     );
     defer result.deinit();
 
