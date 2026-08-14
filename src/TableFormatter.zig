@@ -445,13 +445,7 @@ pub fn strlen(self: *TableFormatter, string: []const u8) usize {
     const clean = self.removeAnsiCodes(string);
     defer self.allocator.free(clean);
 
-    const view = std.unicode.Utf8View.init(clean) catch return clean.len;
-    var iter = view.iterator();
-    var count: usize = 0;
-    while (iter.nextCodepoint()) |_| {
-        count += 1;
-    }
-    return count;
+    return std.unicode.utf8CountCodepoints(clean) catch clean.len;
 }
 
 /// Удаляет ANSI-escape-последовательности вида `\x1b[<num>(;<num>)m` из строки.

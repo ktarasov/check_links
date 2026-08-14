@@ -209,15 +209,9 @@ pub const Bar = struct {
         self.write(output);
     }
 
-    /// Длина строки в символах (кодовых точках UTF-8), без учёта ANSI-кодов.
+    /// Длина строки в символах (кодовых точках UTF-8).
     fn strlen(string: []const u8) usize {
-        const view = std.unicode.Utf8View.init(string) catch return string.len;
-        var iter = view.iterator();
-        var count: usize = 0;
-        while (iter.nextCodepoint()) |_| {
-            count += 1;
-        }
-        return count;
+        return std.unicode.utf8CountCodepoints(string) catch string.len;
     }
 
     /// Вычислить строку-полосу для токена `:bar`.
