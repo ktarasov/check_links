@@ -6,6 +6,7 @@
 //! `CheckHttpCodeByUrlList`.
 
 const std = @import("std");
+const http_head_client = @import("http_head_client.zig");
 
 /// Таймаут ожидания ответа от сервера в секундах.
 pub const timeout_seconds: u64 = 30;
@@ -82,32 +83,28 @@ fn worker(state: *SharedState, url: []const u8) void {
 }
 
 /// Выполняет HEAD-запрос к одному URL и возвращает результат.
+///
+/// Используется собственный HTTP HEAD-клиент `HttpHeadClient` (замена
+/// `std.http.Client`), который поддерживает таймаут запроса.
 fn checkOneUrl(
     io: std.Io,
     allocator: std.mem.Allocator,
     url: []const u8,
 ) ResolveUrlResult {
-    var client: std.http.Client = .{
-        .allocator = allocator,
+    var client: http_head_client.HttpHeadClient = .{
         .io = io,
+        .allocator = allocator,
+        .timeout_ms = timeout_seconds * 1000,
     };
     defer client.deinit();
 
-    const fetch_result = client.fetch(.{
-        .location = .{ .url = url },
-        .method = .HEAD,
-        .redirect_behavior = .not_allowed,
-        .headers = .{
-            .user_agent = .{ .override = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36" },
-        },
-    }) catch {
+    const code = client.check(url) catch {
         return .{
             .http_code = 0,
             .url = url,
         };
     };
 
-    const code: u16 = @intFromEnum(fetch_result.status);
     return .{
         .http_code = code,
         .url = url,
