@@ -10,6 +10,7 @@ test {
     _ = @import("html_parser.zig");
     _ = @import("collect_urls.zig");
     _ = @import("check_http.zig");
+    _ = @import("http_head_client.zig");
     _ = @import("check_link_list.zig");
     _ = @import("TableFormatter.zig");
     _ = @import("table_view.zig");
