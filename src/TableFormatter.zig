@@ -555,7 +555,7 @@ fn wrapLine(
     }
 
     // Слова — срезы исходной строки, владение остаётся за `line`.
-    var words = splitByWhitespace(line);
+    var words = splitByWhitespace(self.allocator, line);
     defer words.deinit();
 
     var actual = std.array_list.Managed(u8).initCapacity(self.allocator, line.len) catch return error.OutOfMemory;
@@ -593,8 +593,8 @@ fn wrapLine(
 
 /// Разбивает строку по пробелам и табуляции. Возвращает список срезов,
 /// ссылающихся на память исходной строки (владение не передаётся).
-fn splitByWhitespace(str: []const u8) std.array_list.Managed([]const u8) {
-    var result = std.array_list.Managed([]const u8).init(std.heap.page_allocator);
+fn splitByWhitespace(allocator: std.mem.Allocator, str: []const u8) std.array_list.Managed([]const u8) {
+    var result = std.array_list.Managed([]const u8).init(allocator);
     var i: usize = 0;
     while (i < str.len) {
         while (i < str.len and (str[i] == ' ' or str[i] == '\t')) : (i += 1) {}
@@ -872,4 +872,12 @@ test "Colors.wrap оборачивает текст кодом и сбросом
     const wrapped = try Colors.wrap(testing.allocator, "текст", Colors.green);
     defer testing.allocator.free(wrapped);
     try testing.expectEqualStrings("\x1b[0;32mтекст\x1b[0m", wrapped);
+}
+
+test "splitByWhitespace: проверка разбиения строки по пробелам и табуляции" {
+    const string = "проверка разбиения строки по пробелам и\tтабуляции";
+    const list = splitByWhitespace(std.testing.allocator, string);
+    defer list.deinit();
+
+    try testing.expectEqual(list.items.len, 7);
 }
