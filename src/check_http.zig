@@ -7,6 +7,7 @@
 
 const std = @import("std");
 const http_head_client = @import("http_head_client.zig");
+const request_headers = @import("request_headers.zig");
 
 /// Таймаут ожидания ответа от сервера в секундах.
 pub const timeout_seconds: u64 = 30;
@@ -27,7 +28,9 @@ pub const ResolveUrlResult = struct {
 pub fn checkHttpCodes(
     io: std.Io,
     allocator: std.mem.Allocator,
+    source_url: []const u8,
     url_list: []const []const u8,
+    headers: []const std.http.Header,
 ) !std.ArrayList(ResolveUrlResult) {
     var result = std.ArrayList(ResolveUrlResult).empty;
     errdefer result.deinit(allocator);
@@ -41,6 +44,8 @@ pub fn checkHttpCodes(
         .io = io,
         .mutex = &mutex,
         .results = &result,
+        .source_url = source_url,
+        .headers = headers,
     };
 
     var threads = std.ArrayList(std.Thread).empty;
@@ -71,11 +76,14 @@ const SharedState = struct {
     io: std.Io,
     mutex: *std.Io.Mutex,
     results: *std.ArrayList(ResolveUrlResult),
+    source_url: []const u8,
+    headers: []const std.http.Header,
 };
 
 /// Функция-воркер: выполняет HEAD-запрос к одному URL и сохраняет результат.
 fn worker(state: *SharedState, url: []const u8) void {
-    const r = checkOneUrl(state.io, state.allocator, url);
+    const headers = if (request_headers.sameOrigin(state.source_url, url)) state.headers else &.{};
+    const r = checkOneUrl(state.io, state.allocator, url, headers);
 
     state.mutex.lockUncancelable(state.io);
     defer state.mutex.unlock(state.io);
@@ -90,11 +98,13 @@ fn checkOneUrl(
     io: std.Io,
     allocator: std.mem.Allocator,
     url: []const u8,
+    headers: []const std.http.Header,
 ) ResolveUrlResult {
     var client: http_head_client.HttpHeadClient = .{
         .io = io,
         .allocator = allocator,
         .timeout_ms = timeout_seconds * 1000,
+        .headers = headers,
     };
     defer client.deinit();
 
@@ -113,14 +123,14 @@ fn checkOneUrl(
 
 test "checkHttpCodes: пустой список возвращает пустой результат" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, &.{});
+    var result = try checkHttpCodes(std.testing.io, allocator, "https://example.com", &.{}, &.{});
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }
 
 test "checkHttpCodes: пропускает пустые строки" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, &.{ "", "", "" });
+    var result = try checkHttpCodes(std.testing.io, allocator, "https://example.com", &.{ "", "", "" }, &.{});
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }

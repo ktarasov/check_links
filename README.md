@@ -20,6 +20,7 @@
 - Удаление дубликатов URL.
 - Конкурентная проверка доступности каждого URL методом `HEAD` (по одному потоку на URL).
 - Собственный HTTP HEAD-клиент с поддержкой TLS и таймаута запроса (по умолчанию 30 секунд).
+- Повторяемые пользовательские HTTP-заголовки для авторизованных страниц и ссылок того же origin.
 - Группировка результатов по HTTP-коду ответа.
 - Вывод в терминал в виде таблицы с цветовой подсветкой кодов:
   - `2xx` — зелёный;
@@ -74,6 +75,7 @@ check_links <URL> [опции]
 | `<URL>` | URL страницы, ссылки которой нужно проверить (обязательный). |
 | `-f`, `--fail` | Показывать только ошибочные ссылки. |
 | `-e`, `--export <файл>` | Экспорт результатов в CSV-файл. |
+| `-H`, `--header <NAME: VALUE>` | Добавить HTTP-заголовок; опцию можно повторять. |
 
 ### Примеры
 
@@ -89,7 +91,16 @@ check_links --export result.csv https://example.com/
 
 # Экспортировать только ошибочные ссылки в CSV
 check_links --fail --export errors.csv https://example.com/
+
+# Проверить авторизованную страницу с несколькими заголовками
+check_links -H 'Authorization: Bearer token' \
+  --header 'X-Tenant-ID: 42' \
+  https://example.com/private
 ```
+
+Заголовки передаются при загрузке исходной страницы и при `HEAD`-проверке ссылок с тем же origin (схема, хост и эффективный порт). При переходе или проверке внешнего origin они не отправляются. Используйте только форму с пробелом `--header 'NAME: VALUE'`: форма `--header='NAME: VALUE'` не поддерживается.
+
+> Значения заголовков, переданные в командной строке, могут сохраниться в истории shell или быть видны другим локальным процессам. Учитывайте это при передаче токенов и других секретов.
 
 ### Пример вывода (таблица)
 
@@ -271,6 +282,7 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Removes duplicate URLs.
 - Concurrently checks the availability of each URL using the `HEAD` method (one thread per URL).
 - Custom HTTP HEAD client with TLS support and a request timeout (30 seconds by default).
+- Repeatable custom HTTP headers for authenticated pages and same-origin links.
 - Groups results by HTTP response code.
 - Terminal table output with color-coded codes:
   - `2xx` — green;
@@ -325,6 +337,7 @@ check_links <URL> [options]
 | `<URL>` | URL of the page whose links to check (required). |
 | `-f`, `--fail` | Show only failed links. |
 | `-e`, `--export <file>` | Export results to a CSV file. |
+| `-H`, `--header <NAME: VALUE>` | Add an HTTP header; may be repeated. |
 
 ### Examples
 
@@ -340,7 +353,16 @@ check_links --export result.csv https://example.com/
 
 # Export only failed links to CSV
 check_links --fail --export errors.csv https://example.com/
+
+# Check an authenticated page with multiple headers
+check_links -H 'Authorization: Bearer token' \
+  --header 'X-Tenant-ID: 42' \
+  https://example.com/private
 ```
+
+Headers are sent when loading the source page and when making `HEAD` requests to links with the same origin (scheme, host, and effective port). They are omitted when redirecting to or checking an external origin. Use the space-separated form `--header 'NAME: VALUE'`; `--header='NAME: VALUE'` is not supported.
+
+> Header values passed on the command line may be stored in shell history or visible to other local processes. Keep this in mind when passing tokens or other secrets.
 
 ### Example Output (table)
 
