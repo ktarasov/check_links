@@ -35,12 +35,10 @@ pub fn main(init: std.process.Init) !u8 {
         .help = "Output in CSV format",
     });
 
-    // Регистрируется для справки; значения извлекаются предварительно из-за
-    // дефекта повторяемых inline-опций в args.zig 0.0.7.
     try parser.addAppend("header", .{
         .short = 'H',
         .metavar = "NAME: VALUE",
-        .help = "Set an HTTP header (can be repeated; do not use '=')",
+        .help = "Set an HTTP header (can be repeated)",
     });
 
     try parser.addPositional("url", .{
@@ -49,26 +47,27 @@ pub fn main(init: std.process.Init) !u8 {
     });
 
     const process_args = try init.minimal.args.toSlice(arena);
-    const argv = try arena.alloc([]const u8, if (process_args.len > 0) process_args.len - 1 else 0);
-    const first_cli_arg: usize = if (process_args.len > 0) 1 else 0;
-    for (process_args[first_cli_arg..], 0..) |arg, index| {
-        argv[index] = arg;
-    }
+    const first_cli_arg: usize = @intFromBool(process_args.len > 0);
+    var normalized_args = try request_headers.normalizeCliArguments(arena, process_args[first_cli_arg..]);
+    defer normalized_args.deinit(arena);
 
-    var extracted = request_headers.extractCliArguments(arena, argv) catch |err| {
-        printHeaderError(io, err);
+    var result = parser.parseWithIo(normalized_args.items, io) catch |err| {
+        const message = switch (err) {
+            error.MissingValue => "для опции не указано значение",
+            error.InvalidFormat => "некорректный формат аргумента",
+            else => return err,
+        };
+        printError(io, message);
         return 1;
     };
-    defer extracted.deinit(arena);
+    defer result.deinit();
 
-    var headers = request_headers.parse(arena, extracted.header_values.items) catch |err| {
+    const raw_headers = result.getArray("header") orelse &.{};
+    var headers = request_headers.parse(arena, raw_headers) catch |err| {
         printHeaderError(io, err);
         return 1;
     };
     defer headers.deinit(arena);
-
-    var result = try parser.parseWithIo(extracted.args.items, io);
-    defer result.deinit();
 
     return check_links_by_page.run(io, arena, .{
         .url = result.getString("url").?,
@@ -80,8 +79,6 @@ pub fn main(init: std.process.Init) !u8 {
 
 fn printHeaderError(io: Io, err: anyerror) void {
     const message = switch (err) {
-        error.MissingHeaderValue => "для --header/-H не указано значение NAME: VALUE",
-        error.InlineHeaderUnsupported => "форма --header=VALUE не поддерживается; используйте --header 'NAME: VALUE'",
         error.InvalidHeaderFormat => "заголовок должен иметь формат NAME: VALUE",
         error.InvalidHeaderName => "имя заголовка некорректно",
         error.InvalidHeaderValue => "значение заголовка содержит запрещённый перевод строки",
@@ -89,6 +86,10 @@ fn printHeaderError(io: Io, err: anyerror) void {
         else => "не удалось обработать HTTP-заголовки",
     };
 
+    printError(io, message);
+}
+
+fn printError(io: Io, message: []const u8) void {
     var buffer: [1024]u8 = undefined;
     var writer = std.Io.File.stderr().writer(io, &buffer);
     writer.interface.print("Ошибка: {s}\n", .{message}) catch {};

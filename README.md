@@ -98,7 +98,7 @@ check_links -H 'Authorization: Bearer token' \
   https://example.com/private
 ```
 
-Заголовки передаются при загрузке исходной страницы и при `HEAD`-проверке ссылок с тем же origin (схема, хост и эффективный порт). При переходе или проверке внешнего origin они не отправляются. Используйте только форму с пробелом `--header 'NAME: VALUE'`: форма `--header='NAME: VALUE'` не поддерживается.
+Заголовки передаются при загрузке исходной страницы и при `HEAD`-проверке ссылок с тем же origin (схема, хост и эффективный порт). При переходе или проверке внешнего origin они не отправляются. Поддерживаются формы `--header 'NAME: VALUE'` и `--header='NAME: VALUE'`.
 
 > Значения заголовков, переданные в командной строке, могут сохраниться в истории shell или быть видны другим локальным процессам. Учитывайте это при передаче токенов и других секретов.
 
@@ -360,7 +360,7 @@ check_links -H 'Authorization: Bearer token' \
   https://example.com/private
 ```
 
-Headers are sent when loading the source page and when making `HEAD` requests to links with the same origin (scheme, host, and effective port). They are omitted when redirecting to or checking an external origin. Use the space-separated form `--header 'NAME: VALUE'`; `--header='NAME: VALUE'` is not supported.
+Headers are sent when loading the source page and when making `HEAD` requests to links with the same origin (scheme, host, and effective port). They are omitted when redirecting to or checking an external origin. Both `--header 'NAME: VALUE'` and `--header='NAME: VALUE'` forms are supported.
 
 > Header values passed on the command line may be stored in shell history or visible to other local processes. Keep this in mind when passing tokens or other secrets.
 

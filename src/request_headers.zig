@@ -11,56 +11,25 @@ pub const ParseError = error{
     ManagedFramingHeader,
 };
 
-pub const CliError = error{
-    MissingHeaderValue,
-    InlineHeaderUnsupported,
-};
-
-pub const CliArguments = struct {
-    args: std.ArrayList([]const u8),
-    header_values: std.ArrayList([]const u8),
-
-    pub fn deinit(self: *CliArguments, allocator: std.mem.Allocator) void {
-        self.args.deinit(allocator);
-        self.header_values.deinit(allocator);
-    }
-};
-
-/// Извлекает повторяемые `-H VALUE` / `--header VALUE`, оставляя остальные
-/// аргументы для основного CLI-парсера.
-pub fn extractCliArguments(
-    allocator: std.mem.Allocator,
-    argv: []const []const u8,
-) (CliError || std.mem.Allocator.Error)!CliArguments {
-    var result: CliArguments = .{
-        .args = .empty,
-        .header_values = .empty,
-    };
+/// Преобразует inline-заголовки в отдельные аргументы, поскольку `addAppend`
+/// в args.zig 0.0.9 не сохраняет inline-значения в массиве результата.
+pub fn normalizeCliArguments(allocator: std.mem.Allocator, argv: anytype) std.mem.Allocator.Error!std.ArrayList([]const u8) {
+    var result: std.ArrayList([]const u8) = .empty;
     errdefer result.deinit(allocator);
 
-    var index: usize = 0;
-    while (index < argv.len) : (index += 1) {
-        const arg = argv[index];
-
-        if (std.mem.eql(u8, arg, "--")) {
-            try result.args.appendSlice(allocator, argv[index..]);
-            break;
-        }
-
-        if (std.mem.startsWith(u8, arg, "--header=") or
-            std.mem.startsWith(u8, arg, "-H="))
-        {
-            return error.InlineHeaderUnsupported;
-        }
-
-        if (std.mem.eql(u8, arg, "--header") or std.mem.eql(u8, arg, "-H")) {
-            index += 1;
-            if (index >= argv.len) return error.MissingHeaderValue;
-            try result.header_values.append(allocator, argv[index]);
+    var parse_options = true;
+    for (argv) |arg| {
+        if (parse_options and std.mem.eql(u8, arg, "--")) {
+            parse_options = false;
+        } else if (parse_options and std.mem.startsWith(u8, arg, "--header=")) {
+            try result.appendSlice(allocator, &.{ "--header", arg["--header=".len..] });
+            continue;
+        } else if (parse_options and std.mem.startsWith(u8, arg, "-H=")) {
+            try result.appendSlice(allocator, &.{ "-H", arg["-H=".len..] });
             continue;
         }
 
-        try result.args.append(allocator, arg);
+        try result.append(allocator, arg);
     }
 
     return result;
@@ -172,36 +141,31 @@ test "parse: отклоняет некорректные и управляемы
     try std.testing.expectError(error.ManagedFramingHeader, parse(allocator, &.{"transfer-encoding: chunked"}));
 }
 
-test "extractCliArguments: извлекает заголовки и сохраняет остальные аргументы" {
+test "normalizeCliArguments: разворачивает inline-заголовки до разделителя" {
     const allocator = std.testing.allocator;
-    var extracted = try extractCliArguments(allocator, &.{
-        "--fail",
-        "-H",
-        "Authorization: Bearer token",
-        "https://example.com/",
+    const input = [_][]const u8{
+        "--export=result.csv",
+        "--header=X-One: 1",
+        "-H=X-Two: 2",
+        "--",
+        "--header=X-Positional: 3",
+    };
+    var args = try normalizeCliArguments(allocator, &input);
+    defer args.deinit(allocator);
+
+    const expected = [_][]const u8{
+        "--export=result.csv",
         "--header",
-        "X-Test: yes",
-    });
-    defer extracted.deinit(allocator);
-
-    try std.testing.expectEqualSlices([]const u8, &.{ "--fail", "https://example.com/" }, extracted.args.items);
-    try std.testing.expectEqualSlices([]const u8, &.{ "Authorization: Bearer token", "X-Test: yes" }, extracted.header_values.items);
-}
-
-test "extractCliArguments: не разбирает аргументы после разделителя" {
-    const allocator = std.testing.allocator;
-    var extracted = try extractCliArguments(allocator, &.{ "--", "--header", "X-Test: yes" });
-    defer extracted.deinit(allocator);
-
-    try std.testing.expectEqualSlices([]const u8, &.{ "--", "--header", "X-Test: yes" }, extracted.args.items);
-    try std.testing.expectEqual(@as(usize, 0), extracted.header_values.items.len);
-}
-
-test "extractCliArguments: отклоняет inline-форму и отсутствующее значение" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectError(error.InlineHeaderUnsupported, extractCliArguments(allocator, &.{"--header=X-Test: yes"}));
-    try std.testing.expectError(error.InlineHeaderUnsupported, extractCliArguments(allocator, &.{"-H=X-Test: yes"}));
-    try std.testing.expectError(error.MissingHeaderValue, extractCliArguments(allocator, &.{"--header"}));
+        "X-One: 1",
+        "-H",
+        "X-Two: 2",
+        "--",
+        "--header=X-Positional: 3",
+    };
+    try std.testing.expectEqual(expected.len, args.items.len);
+    for (expected, args.items) |expected_arg, actual_arg| {
+        try std.testing.expectEqualStrings(expected_arg, actual_arg);
+    }
 }
 
 test "sameOrigin: учитывает схему, host и эффективный порт" {
