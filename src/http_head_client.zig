@@ -8,7 +8,7 @@
 //!  - Предназначен только для HTTP-метода `HEAD`.
 //!  - Поддерживает схемы `http` и `https` (TLS через `std.crypto.tls.Client`).
 //!  - Редиректы не проходятся — возвращается код первого ответа.
-//!  - Таймаут покрывает отправку запроса, чтение ответа и TLS-handshake.
+//!  - Таймаут покрывает TCP-connect, отправку запроса, чтение ответа и TLS-handshake.
 //!
 //! Механизм таймаута: запускается поток-таймер, который по истечении
 //! `timeout_ms` вызывает `shutdown` сокета, прерывая блокирующие операции
@@ -19,10 +19,10 @@
 //!  - таймаут TCP-connect в `std.Io.Threaded` тоже не реализован (паникует
 //!    при `timeout != .none`).
 //!
-//! Ограничение: сам этап TCP-connect таймаутом не покрыт. Connect к
-//! локальным/доступным адресам выполняется практически мгновенно; для защиты
-//! от «зависшего» connect рекомендуется выносить вызов в отдельный поток с
-//! общим дедлайном.
+//! Этап TCP-connect также покрыт таймаутом: `connectMany` запускается
+//! асинхронно, и по истечении `timeout_ms` вызывается `Future.cancel`,
+//! который через механизм отмены блокирующих syscall'ов `std.Io.Threaded`
+//! (`signalCanceledSyscall`/SIGIO) прерывает «зависший» `connect()`.
 
 const std = @import("std");
 
@@ -126,11 +126,8 @@ pub fn check(self: *HttpHeadClient, url: []const u8) Error!u16 {
     var host_buffer: [net.HostName.max_len]u8 = undefined;
     const host = uri.getHost(&host_buffer) catch return error.UriMissingHost;
 
-    // TCP-connect (без ядрового таймаута — см. ограничение в доке модуля).
-    const stream = net.HostName.connect(host, self.io, port, .{ .mode = .stream }) catch |err| switch (err) {
-        error.Canceled => return error.Canceled,
-        else => return mapConnectError(err),
-    };
+    // TCP-connect с таймаутом (см. `connectWithTimeout`).
+    const stream = try self.connectWithTimeout(host, port);
     defer stream.close(self.io);
 
     // Поток-таймер: по истечении дедлайна вызывает shutdown сокета, прерывая
@@ -361,6 +358,117 @@ fn mapConnectError(err: anyerror) Error {
     };
 }
 
+/// Устанавливает TCP-соединение с таймаутом на этап connect.
+///
+/// Воспроизводит логику `net.HostName.connect`, но с получением `Future`
+/// задачи `connectMany`, что позволяет прервать «зависший» `connect()`
+/// через `Future.cancel` по истечении `timeout_ms`. Механизм отмены
+/// (`signalCanceledSyscall`/SIGIO) прерывает блокирующий syscall connect.
+fn connectWithTimeout(self: *HttpHeadClient, host: net.HostName, port: u16) Error!net.Stream {
+    var connect_many_buffer: [32]net.IpAddress.ConnectError!net.Stream = undefined;
+    var connect_many_queue: Io.Queue(net.IpAddress.ConnectError!net.Stream) = .init(&connect_many_buffer);
+
+    var connect_many = self.io.async(net.HostName.connectMany, .{
+        host,
+        self.io,
+        port,
+        &connect_many_queue,
+        .{ .mode = .stream },
+    });
+
+    // Поток-таймер для этапа connect: по истечении дедлайна отменяет
+    // `connectMany`, прерывая блокирующий `connect()`.
+    var timer_event: Io.Event = .unset;
+    var timed_out = std.atomic.Value(bool).init(false);
+    var connect_timer_ctx = ConnectTimerCtx{
+        .io = self.io,
+        .future = &connect_many,
+        .event = &timer_event,
+        .timed_out = &timed_out,
+        .timeout_ms = self.timeout_ms,
+    };
+    const timer_thread: ?std.Thread = if (self.timeout_ms > 0)
+        std.Thread.spawn(.{}, connectTimerFunc, .{&connect_timer_ctx}) catch null
+    else
+        null;
+
+    defer {
+        // Пробуждаем таймер при любом завершении, чтобы он не отменил уже
+        // установленное соединение, и дожидаемся его завершения.
+        timer_event.set(self.io);
+        if (timer_thread) |t| t.join();
+        // Если таймер уже отменил future при таймауте — повторно не отменяем
+        // (это была бы отмена уже уничтоженного future).
+        if (!timed_out.load(.seq_cst)) {
+            connect_many.cancel(self.io) catch {};
+        }
+        // Закрываем соединения, успевшие установиться до завершения/отмены.
+        while (connect_many_queue.getOneUncancelable(self.io)) |loser| {
+            if (loser) |s| s.close(self.io) else |_| {}
+        } else |err| switch (err) {
+            error.Closed => {},
+        }
+    }
+
+    var ip_connect_error: ?net.IpAddress.ConnectError = null;
+
+    while (connect_many_queue.getOne(self.io)) |result| {
+        if (result) |stream| return stream else |err| switch (err) {
+            error.Canceled => unreachable,
+
+            error.SystemResources,
+            error.OptionUnsupported,
+            error.ProcessFdQuotaExceeded,
+            error.SystemFdQuotaExceeded,
+            error.WouldBlock,
+            => |e| return mapConnectError(e),
+
+            else => |e| ip_connect_error = e,
+        }
+    } else |err| switch (err) {
+        error.Canceled => |e| return e,
+        error.Closed => {
+            // Таймер сработал — connect превысил таймаут.
+            if (timed_out.load(.seq_cst)) return error.Timeout;
+            // Разрешение имени / попытки подключения завершились неудачей.
+            if (connect_many.await(self.io)) |_| {
+                return mapConnectError(ip_connect_error orelse error.InvalidResponse);
+            } else |_| {
+                return error.InvalidResponse;
+            }
+        },
+    }
+}
+
+/// Контекст потока-таймера для этапа TCP-connect.
+const ConnectTimerCtx = struct {
+    io: Io,
+    future: *Io.Future(net.HostName.LookupError!void),
+    event: *Io.Event,
+    timed_out: *std.atomic.Value(bool),
+    timeout_ms: u64,
+};
+
+/// Поток-таймер для connect: ждёт либо сигнал об успешном завершении, либо
+/// истечение таймаута. При истечении помечает `timed_out` и отменяет
+/// `connectMany`, что прерывает блокирующий `connect()` через
+/// `signalCanceledSyscall` (SIGIO).
+fn connectTimerFunc(ctx: *ConnectTimerCtx) void {
+    const timeout: Io.Timeout = .{
+        .duration = .{
+            .raw = .fromMilliseconds(@intCast(ctx.timeout_ms)),
+            .clock = .awake,
+        },
+    };
+    ctx.event.waitTimeout(ctx.io, timeout) catch |err| switch (err) {
+        error.Timeout => {
+            ctx.timed_out.store(true, .seq_cst);
+            ctx.future.cancel(ctx.io) catch {};
+        },
+        error.Canceled => {},
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Тесты
 // ---------------------------------------------------------------------------
@@ -572,6 +680,41 @@ test "HEAD: таймаут — сервер не отвечает в течен�
     defer thread.join();
 
     try testing.expectError(error.Timeout, client.check(url));
+}
+
+test "HEAD: connect к недостижимому адресу не вешает клиент" {
+    // Подключение к немаршрутизируемому документационному адресу (RFC 5737,
+    // 192.0.2.0/24) никогда не должно завершаться успехом. В зависимости от
+    // окружения:
+    //  - если ОС блокирует connect (пакеты отбрасываются) — малый таймаут
+    //    прерывает его через `Future.cancel` и возвращает `error.Timeout`;
+    //  - если ОС сразу возвращает "network unreachable" — `error.InvalidResponse`.
+    // В обоих случаях клиент обязан вернуться в пределах таймаута, не зависнув.
+    var client = clientWithTimeout(500);
+    defer client.deinit();
+
+    if (client.check("http://192.0.2.1/")) |_| {
+        // Успешный connect к документационному адресу невозможен.
+        return error.Unexpected;
+    } else |err| switch (err) {
+        error.Timeout => {},
+        error.InvalidResponse => {},
+        else => |e| return e,
+    }
+}
+
+test "HEAD: connect к заблокированному адресу не вешает клиент" {
+    var client = clientWithTimeout(1_000);
+    defer client.deinit();
+
+    if (client.check("https://t.me/zig_lang_ru/1068")) |_| {
+        // Успешный connect к заблокированному адресу невозможен из РФ без VPN.
+        return error.Unexpected;
+    } else |err| switch (err) {
+        error.Timeout => {},
+        error.InvalidResponse => {},
+        else => |e| return e,
+    }
 }
 
 test "HEAD: невалидный URL (нет схемы)" {
