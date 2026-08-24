@@ -18,6 +18,8 @@ pub const Options = struct {
     fail: bool = false,
     /// Имя CSV-файла для экспорта. Если null — вывод в консоль.
     export_filename: ?[]const u8 = null,
+    /// Пользовательские HTTP-заголовки для исходного origin.
+    headers: []const std.http.Header = &.{},
 };
 
 /// Запускает процесс проверки ссылок на странице.
@@ -30,7 +32,7 @@ pub fn run(
     options: Options,
 ) u8 {
     // 1. Сбор всех URL с указанной страницы.
-    var url_list = collect_urls.collectUrls(io, allocator, options.url) catch |err| {
+    var url_list = collect_urls.collectUrls(io, allocator, options.url, options.headers) catch |err| {
         switch (err) {
             error.LoadFailed => printError(io, "Ошибка при загрузке страницы: {s}", .{options.url}),
             error.InvalidUrl => printError(io, "Некорректный URL: {s}", .{options.url}),
@@ -53,7 +55,14 @@ pub fn run(
     var stderr_writer = std.Io.File.stderr().writer(io, &.{});
 
     // 4. Проверка каждого URL.
-    var checked_list = check_link_list.checkLinkList(io, allocator, url_list.items, &stderr_writer.interface) catch {
+    var checked_list = check_link_list.checkLinkList(
+        io,
+        allocator,
+        options.url,
+        url_list.items,
+        options.headers,
+        &stderr_writer.interface,
+    ) catch {
         printError(io, "Ошибка при проверке ссылок", .{});
         return 1;
     };

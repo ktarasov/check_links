@@ -18,4 +18,5 @@ test {
     _ = @import("check_links_by_page.zig");
     _ = @import("bar.zig");
     _ = @import("http_integration_test.zig");
+    _ = @import("request_headers.zig");
 }

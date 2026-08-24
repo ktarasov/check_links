@@ -32,6 +32,7 @@ const Uri = std.Uri;
 const tls = std.crypto.tls.Client;
 const Certificate = std.crypto.Certificate;
 const http = std.http;
+const request_headers = @import("request_headers.zig");
 
 /// Порт по умолчанию для HTTP.
 const default_http_port: u16 = 80;
@@ -54,6 +55,8 @@ io: Io,
 allocator: std.mem.Allocator,
 /// Таймаут чтения/записи ответа в миллисекундах.
 timeout_ms: u64 = default_timeout_ms,
+/// Пользовательские заголовки запроса.
+headers: []const http.Header = &.{},
 
 /// Пул системных сертификатов для TLS (заполняется лениво при первом https).
 ca_bundle_lock: Io.RwLock = .init,
@@ -196,7 +199,7 @@ pub fn check(self: *HttpHeadClient, url: []const u8) Error!u16 {
     };
 
     // Отправляем HEAD-запрос.
-    sendHead(out_writer, &uri) catch {
+    sendHead(out_writer, &uri, self.headers) catch {
         return if (timed_out.load(.seq_cst)) error.Timeout else error.InvalidResponse;
     };
     out_writer.flush() catch {
@@ -279,16 +282,30 @@ fn initTls(
 // ---------------------------------------------------------------------------
 
 /// Записывает HEAD-запрос в writer.
-fn sendHead(w: *Io.Writer, uri: *const Uri) Io.Writer.Error!void {
+fn sendHead(w: *Io.Writer, uri: *const Uri, headers: []const http.Header) Io.Writer.Error!void {
     try w.writeAll("HEAD ");
     try uri.writeToStream(w, .{ .path = true, .query = true });
     try w.writeAll(" HTTP/1.1\r\n");
-    try w.writeAll("host: ");
-    try uri.writeToStream(w, .{ .authority = true });
-    try w.writeAll("\r\n");
-    try w.writeAll("user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36\r\n");
-    try w.writeAll("accept-encoding: gzip, deflate\r\n");
-    try w.writeAll("connection: keep-alive\r\n");
+    if (!request_headers.contains(headers, "host")) {
+        try w.writeAll("host: ");
+        try uri.writeToStream(w, .{ .authority = true });
+        try w.writeAll("\r\n");
+    }
+    for (headers) |header| {
+        try w.writeAll(header.name);
+        try w.writeAll(": ");
+        try w.writeAll(header.value);
+        try w.writeAll("\r\n");
+    }
+    if (!request_headers.contains(headers, "user-agent")) {
+        try w.writeAll("user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36\r\n");
+    }
+    if (!request_headers.contains(headers, "accept-encoding")) {
+        try w.writeAll("accept-encoding: gzip, deflate\r\n");
+    }
+    if (!request_headers.contains(headers, "connection")) {
+        try w.writeAll("connection: keep-alive\r\n");
+    }
     try w.writeAll("\r\n");
 }
 
@@ -361,6 +378,9 @@ const TestServer = struct {
     write_buffer: [8192]u8 = undefined,
     status: http.Status,
     delay_ms: u64 = 0,
+    x_test_count: usize = 0,
+    user_agent_count: usize = 0,
+    custom_user_agent_seen: bool = false,
 
     fn init(io: Io, status: http.Status) !TestServer {
         var address: net.IpAddress = .{ .ip4 = net.Ip4Address.loopback(0) };
@@ -388,6 +408,19 @@ const TestServer = struct {
         var writer = stream.writer(self.io, &self.write_buffer);
         var http_server = http.Server.init(&reader.interface, &writer.interface);
         var request = http_server.receiveHead() catch return;
+
+        var headers = request.iterateHeaders();
+        while (headers.next()) |header| {
+            if (std.ascii.eqlIgnoreCase(header.name, "x-test")) {
+                self.x_test_count += 1;
+            }
+            if (std.ascii.eqlIgnoreCase(header.name, "user-agent")) {
+                self.user_agent_count += 1;
+                if (std.mem.eql(u8, header.value, "custom-agent")) {
+                    self.custom_user_agent_seen = true;
+                }
+            }
+        }
 
         if (self.delay_ms > 0) {
             Io.sleep(self.io, .fromMilliseconds(@intCast(self.delay_ms)), .awake) catch return;
@@ -497,6 +530,31 @@ test "HEAD: граничное условие — нулевой таймаут 
 
     const code = try client.check(url);
     try testing.expectEqual(@as(u16, 200), code);
+}
+
+test "HEAD: отправляет повторяющиеся заголовки и заменяет встроенный User-Agent" {
+    var server = try TestServer.init(testing.io, .ok);
+    defer server.deinit();
+    var url_buf: [256]u8 = undefined;
+    const url = urlFor(&server, "/headers", &url_buf);
+
+    const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
+
+    var client = clientWithTimeout(5_000);
+    client.headers = &.{
+        .{ .name = "X-Test", .value = "one" },
+        .{ .name = "X-Test", .value = "two" },
+        .{ .name = "User-Agent", .value = "custom-agent" },
+    };
+    defer client.deinit();
+
+    const code = try client.check(url);
+    thread.join();
+
+    try testing.expectEqual(@as(u16, 200), code);
+    try testing.expectEqual(@as(usize, 2), server.x_test_count);
+    try testing.expectEqual(@as(usize, 1), server.user_agent_count);
+    try testing.expect(server.custom_user_agent_seen);
 }
 
 test "HEAD: таймаут — сервер не отвечает в течение заданного времени" {
