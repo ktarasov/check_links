@@ -36,6 +36,13 @@ pub fn main(init: std.process.Init) !u8 {
         .help = "Output in CSV format",
     });
 
+    try parser.addIntOption("timeout", .{
+        .short = 't',
+        .help = "Timeout in seconds",
+        .min = 0,
+        .max = 3600,
+    });
+
     try parser.addAppend("header", .{
         .short = 'H',
         .metavar = "NAME: VALUE",
@@ -64,12 +71,18 @@ pub fn main(init: std.process.Init) !u8 {
     };
     defer headers.deinit(arena);
 
-    return check_links_by_page.run(io, arena, .{
-        .url = result.getString("url").?,
-        .fail = result.getBool("fail") orelse false,
-        .export_filename = result.getString("export"),
-        .headers = headers.items,
-    });
+    if (result.getString("url")) |url| {
+        return check_links_by_page.run(io, arena, .{
+            .url = url,
+            .fail = result.getBool("fail") orelse false,
+            .export_filename = result.getString("export"),
+            .headers = headers.items,
+            .timeout = @abs(result.getInt("timeout") orelse 15),
+        });
+    } else {
+        printError(io, "не указан проверяемый URL");
+        return 1;
+    }
 }
 
 fn printHeaderError(io: Io, err: anyerror) void {
