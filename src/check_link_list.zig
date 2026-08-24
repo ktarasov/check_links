@@ -48,6 +48,7 @@ pub fn checkLinkList(
     source_url: []const u8,
     url_list: []const []const u8,
     headers: []const std.http.Header,
+    timeout: u64,
     writer: ?*std.Io.Writer,
 ) !CheckedList {
     var result = CheckedList.init(allocator);
@@ -69,7 +70,14 @@ pub fn checkLinkList(
         const end = @min(start + chunk_size, url_list.len);
         const chunk = url_list[start..end];
 
-        var check_results = try check_http.checkHttpCodes(io, allocator, source_url, chunk, headers);
+        var check_results = try check_http.checkHttpCodes(
+            io,
+            allocator,
+            source_url,
+            chunk,
+            headers,
+            timeout,
+        );
         defer check_results.deinit(allocator);
 
         for (check_results.items) |check_result| {
@@ -106,7 +114,15 @@ fn addToGroup(
 
 test "checkLinkList: пустой список возвращает пустой результат" {
     const allocator = std.testing.allocator;
-    var result = try checkLinkList(std.testing.io, allocator, "https://example.com", &.{}, &.{}, null);
+    var result = try checkLinkList(
+        std.testing.io,
+        allocator,
+        "https://example.com",
+        &.{},
+        &.{},
+        15,
+        null,
+    );
     defer result.deinit();
     try std.testing.expectEqual(@as(usize, 0), result.groups.items.len);
 }

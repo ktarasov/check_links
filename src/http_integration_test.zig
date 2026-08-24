@@ -129,7 +129,14 @@ test "HTTP: сервер отвечает 200" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{url}, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{url},
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -153,7 +160,14 @@ test "HTTP: сервер отвечает 404" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{url}, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{url},
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -176,7 +190,14 @@ test "HTTP: сервер отвечает 500" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{url}, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{url},
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -199,7 +220,14 @@ test "HTTP: сервер отвечает редиректом 301" {
     const thread = try std.Thread.spawn(.{}, serveOneThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{url}, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{url},
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     // Редиректы не проходятся — возвращается код первого ответа.
@@ -224,7 +252,14 @@ test "HTTP: пустые URL пропускаются" {
     defer thread.join();
 
     // Пустые строки должны быть пропущены, проверяется только непустой URL.
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{ "", url, "" }, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{ "", url, "" },
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 1), result.items.len);
@@ -248,7 +283,14 @@ test "HTTP: дубликаты URL проверяются каждый" {
     const thread = try std.Thread.spawn(.{}, serveTwoThread, .{&server});
     defer thread.join();
 
-    var result = try check_http.checkHttpCodes(io, allocator, url, &.{ url, url }, &.{});
+    var result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        url,
+        &.{ url, url },
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.items.len);
@@ -267,7 +309,14 @@ test "HTTP: пользовательские заголовки отправля
     const origin_url = std.fmt.bufPrint(&origin_url_buffer, "http://127.0.0.1:{d}/internal", .{origin_server.port()}) catch unreachable;
 
     const origin_thread = try std.Thread.spawn(.{}, serveOneThread, .{&origin_server});
-    var origin_result = try check_http.checkHttpCodes(io, allocator, origin_url, &.{origin_url}, headers);
+    var origin_result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        origin_url,
+        &.{origin_url},
+        headers,
+        15,
+    );
     defer origin_result.deinit(allocator);
     origin_thread.join();
     try std.testing.expectEqual(@as(usize, 1), origin_server.authorization_count);
@@ -278,7 +327,14 @@ test "HTTP: пользовательские заголовки отправля
     const external_url = std.fmt.bufPrint(&external_url_buffer, "http://127.0.0.1:{d}/external", .{external_server.port()}) catch unreachable;
 
     const external_thread = try std.Thread.spawn(.{}, serveOneThread, .{&external_server});
-    var external_result = try check_http.checkHttpCodes(io, allocator, origin_url, &.{external_url}, headers);
+    var external_result = try check_http.checkHttpCodes(
+        io,
+        allocator,
+        origin_url,
+        &.{external_url},
+        headers,
+        15,
+    );
     defer external_result.deinit(allocator);
     external_thread.join();
     try std.testing.expectEqual(@as(usize, 0), external_server.authorization_count);
@@ -314,6 +370,7 @@ test "HTTP: checkLinkList группирует разные статусы" {
         base,
         &.{ ok_url, missing_url, error_url, redirect_url },
         &.{},
+        15,
         null,
     );
     defer result.deinit();

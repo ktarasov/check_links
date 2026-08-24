@@ -9,9 +9,6 @@ const std = @import("std");
 const http_head_client = @import("http_head_client.zig");
 const request_headers = @import("request_headers.zig");
 
-/// Таймаут ожидания ответа от сервера в секундах.
-pub const timeout_seconds: u64 = 30;
-
 /// Результат проверки одного URL.
 pub const ResolveUrlResult = struct {
     /// HTTP-код ответа (например, 200, 301, 404). 0 — если запрос не удался.
@@ -31,6 +28,7 @@ pub fn checkHttpCodes(
     source_url: []const u8,
     url_list: []const []const u8,
     headers: []const std.http.Header,
+    timeout: u64,
 ) !std.ArrayList(ResolveUrlResult) {
     var result = std.ArrayList(ResolveUrlResult).empty;
     errdefer result.deinit(allocator);
@@ -46,6 +44,7 @@ pub fn checkHttpCodes(
         .results = &result,
         .source_url = source_url,
         .headers = headers,
+        .timeout = timeout,
     };
 
     var threads = std.ArrayList(std.Thread).empty;
@@ -78,12 +77,14 @@ const SharedState = struct {
     results: *std.ArrayList(ResolveUrlResult),
     source_url: []const u8,
     headers: []const std.http.Header,
+    timeout: u64,
 };
 
 /// Функция-воркер: выполняет HEAD-запрос к одному URL и сохраняет результат.
 fn worker(state: *SharedState, url: []const u8) void {
     const headers = if (request_headers.sameOrigin(state.source_url, url)) state.headers else &.{};
-    const r = checkOneUrl(state.io, state.allocator, url, headers);
+    const r = checkOneUrl(state.io, state.allocator, url, headers, state.timeout);
+    // const r = checkOneUrl(state.io, state.allocator, url, &.{});
 
     state.mutex.lockUncancelable(state.io);
     defer state.mutex.unlock(state.io);
@@ -99,11 +100,12 @@ fn checkOneUrl(
     allocator: std.mem.Allocator,
     url: []const u8,
     headers: []const std.http.Header,
+    timeout: u64,
 ) ResolveUrlResult {
     var client: http_head_client.HttpHeadClient = .{
         .io = io,
         .allocator = allocator,
-        .timeout_ms = timeout_seconds * 1000,
+        .timeout_ms = timeout * 1000,
         .headers = headers,
     };
     defer client.deinit();
@@ -123,14 +125,28 @@ fn checkOneUrl(
 
 test "checkHttpCodes: пустой список возвращает пустой результат" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, "https://example.com", &.{}, &.{});
+    var result = try checkHttpCodes(
+        std.testing.io,
+        allocator,
+        "https://example.com",
+        &.{},
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }
 
 test "checkHttpCodes: пропускает пустые строки" {
     const allocator = std.testing.allocator;
-    var result = try checkHttpCodes(std.testing.io, allocator, "https://example.com", &.{ "", "", "" }, &.{});
+    var result = try checkHttpCodes(
+        std.testing.io,
+        allocator,
+        "https://example.com",
+        &.{ "", "", "" },
+        &.{},
+        15,
+    );
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.items.len);
 }

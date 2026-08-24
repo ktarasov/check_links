@@ -16,6 +16,8 @@ pub const Options = struct {
     url: []const u8,
     /// Если true — показывать только упавшие (ошибочные) ссылки.
     fail: bool = false,
+    /// Таймаут запроса в секундах
+    timeout: u64 = 15,
     /// Имя CSV-файла для экспорта. Если null — вывод в консоль.
     export_filename: ?[]const u8 = null,
     /// Пользовательские HTTP-заголовки для исходного origin.
@@ -61,6 +63,7 @@ pub fn run(
         options.url,
         url_list.items,
         options.headers,
+        options.timeout,
         &stderr_writer.interface,
     ) catch {
         printError(io, "Ошибка при проверке ссылок", .{});
