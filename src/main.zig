@@ -21,6 +21,7 @@ pub fn main(init: std.process.Init) !u8 {
         .config = .{
             .allow_negated_flags = false,
             .exit_on_error = true,
+            .help_indent = 30,
         },
     });
     defer parser.deinit();
@@ -46,15 +47,9 @@ pub fn main(init: std.process.Init) !u8 {
         .required = true,
     });
 
-    const process_args = try init.minimal.args.toSlice(arena);
-    const first_cli_arg: usize = @intFromBool(process_args.len > 0);
-    var normalized_args = try request_headers.normalizeCliArguments(arena, process_args[first_cli_arg..]);
-    defer normalized_args.deinit(arena);
-
-    var result = parser.parseWithIo(normalized_args.items, io) catch |err| {
+    var result = parser.parseProcess(init) catch |err| {
         const message = switch (err) {
-            error.MissingValue => "для опции не указано значение",
-            error.InvalidFormat => "некорректный формат аргумента",
+            error.OutOfMemory => "недостаточно памяти",
             else => return err,
         };
         printError(io, message);

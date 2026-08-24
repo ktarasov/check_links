@@ -11,30 +11,6 @@ pub const ParseError = error{
     ManagedFramingHeader,
 };
 
-/// Преобразует inline-заголовки в отдельные аргументы, поскольку `addAppend`
-/// в args.zig 0.0.9 не сохраняет inline-значения в массиве результата.
-pub fn normalizeCliArguments(allocator: std.mem.Allocator, argv: anytype) std.mem.Allocator.Error!std.ArrayList([]const u8) {
-    var result: std.ArrayList([]const u8) = .empty;
-    errdefer result.deinit(allocator);
-
-    var parse_options = true;
-    for (argv) |arg| {
-        if (parse_options and std.mem.eql(u8, arg, "--")) {
-            parse_options = false;
-        } else if (parse_options and std.mem.startsWith(u8, arg, "--header=")) {
-            try result.appendSlice(allocator, &.{ "--header", arg["--header=".len..] });
-            continue;
-        } else if (parse_options and std.mem.startsWith(u8, arg, "-H=")) {
-            try result.appendSlice(allocator, &.{ "-H", arg["-H=".len..] });
-            continue;
-        }
-
-        try result.append(allocator, arg);
-    }
-
-    return result;
-}
-
 /// Разбирает значения заголовков. Срезы имени и значения указывают на строки
 /// из `raw_headers` и должны жить не меньше возвращённого списка.
 pub fn parse(
@@ -139,33 +115,6 @@ test "parse: отклоняет некорректные и управляемы
     try std.testing.expectError(error.InvalidHeaderValue, parse(allocator, &.{"X-Test: one\r\ntwo"}));
     try std.testing.expectError(error.ManagedFramingHeader, parse(allocator, &.{"Content-Length: 10"}));
     try std.testing.expectError(error.ManagedFramingHeader, parse(allocator, &.{"transfer-encoding: chunked"}));
-}
-
-test "normalizeCliArguments: разворачивает inline-заголовки до разделителя" {
-    const allocator = std.testing.allocator;
-    const input = [_][]const u8{
-        "--export=result.csv",
-        "--header=X-One: 1",
-        "-H=X-Two: 2",
-        "--",
-        "--header=X-Positional: 3",
-    };
-    var args = try normalizeCliArguments(allocator, &input);
-    defer args.deinit(allocator);
-
-    const expected = [_][]const u8{
-        "--export=result.csv",
-        "--header",
-        "X-One: 1",
-        "-H",
-        "X-Two: 2",
-        "--",
-        "--header=X-Positional: 3",
-    };
-    try std.testing.expectEqual(expected.len, args.items.len);
-    for (expected, args.items) |expected_arg, actual_arg| {
-        try std.testing.expectEqualStrings(expected_arg, actual_arg);
-    }
 }
 
 test "sameOrigin: учитывает схему, host и эффективный порт" {
