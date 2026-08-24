@@ -19,7 +19,8 @@
 - Нормализация относительных ссылок в абсолютные на основе базового домена (включая протокол-относительные `//`).
 - Удаление дубликатов URL.
 - Конкурентная проверка доступности каждого URL методом `HEAD` (по одному потоку на URL).
-- Собственный HTTP HEAD-клиент с поддержкой TLS и таймаута запроса (по умолчанию 30 секунд).
+- Пакетная обработка URL чанками по 10 (конкурентно внутри чанка, последовательно между чанками).
+- Собственный HTTP HEAD-клиент с поддержкой TLS и таймаута запроса (по умолчанию 15 секунд, настраивается через `--timeout`).
 - Повторяемые пользовательские HTTP-заголовки для авторизованных страниц и ссылок того же origin.
 - Группировка результатов по HTTP-коду ответа.
 - Вывод в терминал в виде таблицы с цветовой подсветкой кодов:
@@ -75,6 +76,7 @@ check_links <URL> [опции]
 | `<URL>` | URL страницы, ссылки которой нужно проверить (обязательный). |
 | `-f`, `--fail` | Показывать только ошибочные ссылки. |
 | `-e`, `--export <файл>` | Экспорт результатов в CSV-файл. |
+| `-t`, `--timeout <секунды>` | Таймаут запроса в секундах (по умолчанию 15; `0` — без таймаута). |
 | `-H`, `--header <NAME: VALUE>` | Добавить HTTP-заголовок; опцию можно повторять. |
 
 ### Примеры
@@ -85,6 +87,9 @@ check_links https://example.com/
 
 # Показать только ошибочные ссылки
 check_links --fail https://example.com/
+
+# Увеличить таймаут запроса до 60 секунд
+check_links --timeout 60 https://example.com/
 
 # Экспортировать результаты в CSV-файл
 check_links --export result.csv https://example.com/
@@ -214,19 +219,21 @@ check_links --fail https://сайт-клиента.рф/
 
 | Модуль | Назначение |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов. |
+| [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов (включая таймаут). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Оркестрация проверки ссылок на одной странице. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Загрузка страницы и сбор URL из HTML. |
-| [`src/html_parser.zig`](src/html_parser.zig) | Лёгкий HTML-парсер для извлечения `href`/`src`. |
+| [`src/html_parser.zig`](src/html_parser.zig) | HTML-парсер (на основе библиотеки `zigquery`) для извлечения `href`/`src`. |
 | [`src/url_normalize.zig`](src/url_normalize.zig) | Нормализация и построение абсолютных URL. |
 | [`src/check_link_list.zig`](src/check_link_list.zig) | Пакетная проверка списка URL (чанки) и группировка по коду. |
 | [`src/check_http.zig`](src/check_http.zig) | Конкурентная проверка HTTP-кодов. |
 | [`src/http_head_client.zig`](src/http_head_client.zig) | Собственный HTTP HEAD-клиент с TLS и таймаутом. |
+| [`src/request_headers.zig`](src/request_headers.zig) | Разбор пользовательских HTTP-заголовков и проверка same-origin. |
 | [`src/table_view.zig`](src/table_view.zig) | Вывод результатов в виде таблицы в терминал. |
 | [`src/export_csv.zig`](src/export_csv.zig) | Экспорт результатов в CSV. |
 | [`src/TableFormatter.zig`](src/TableFormatter.zig) | Форматирование таблицы под ширину терминала. |
 | [`src/bar.zig`](src/bar.zig) | Прогресс-бар выполнения проверки. |
 | [`src/tests.zig`](src/tests.zig) | Корневой файл тестов. |
+| [`src/http_integration_test.zig`](src/http_integration_test.zig) | Интеграционные тесты HTTP-проверки на локальном сервере. |
 
 ## Как это работает
 
@@ -241,7 +248,7 @@ check_links --fail https://сайт-клиента.рф/
 При экспорте используется разделитель `;`. Структура файла:
 
 ```
-Номер;URL страницы;Проверенный URL;HTTP код
+№;URL страницы;Проверенный URL;HTTP Код
 1;https://example.com;https://example.com/page1;200
 2;https://example.com;https://example.com/page2;404
 ```
@@ -256,7 +263,7 @@ check_links --fail https://сайт-клиента.рф/
 zig build test
 ```
 
-Тесты покрывают: парсинг HTML, нормализацию URL, сбор ссылок со страницы, проверку HTTP-кодов на локальном тестовом сервере (включая таймауты и редиректы), форматирование таблицы и экспорт в CSV.
+Тесты покрывают: парсинг HTML (на базе `zigquery`), нормализацию URL, сбор ссылок со страницы, разбор пользовательских HTTP-заголовков и политику same-origin, проверку HTTP-кодов на локальном тестовом сервере (включая таймауты и редиректы), форматирование таблицы и экспорт в CSV.
 
 ## Лицензия
 
@@ -281,7 +288,8 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Normalizes relative links into absolute ones based on the base domain (including protocol-relative `//` links).
 - Removes duplicate URLs.
 - Concurrently checks the availability of each URL using the `HEAD` method (one thread per URL).
-- Custom HTTP HEAD client with TLS support and a request timeout (30 seconds by default).
+- Processes URLs in chunks of 10 (concurrently within a chunk, sequentially between chunks).
+- Custom HTTP HEAD client with TLS support and a request timeout (15 seconds by default, configurable via `--timeout`).
 - Repeatable custom HTTP headers for authenticated pages and same-origin links.
 - Groups results by HTTP response code.
 - Terminal table output with color-coded codes:
@@ -337,6 +345,7 @@ check_links <URL> [options]
 | `<URL>` | URL of the page whose links to check (required). |
 | `-f`, `--fail` | Show only failed links. |
 | `-e`, `--export <file>` | Export results to a CSV file. |
+| `-t`, `--timeout <seconds>` | Request timeout in seconds (default 15; `0` — no timeout). |
 | `-H`, `--header <NAME: VALUE>` | Add an HTTP header; may be repeated. |
 
 ### Examples
@@ -347,6 +356,9 @@ check_links https://example.com/
 
 # Show only failed links
 check_links --fail https://example.com/
+
+# Increase the request timeout to 60 seconds
+check_links --timeout 60 https://example.com/
 
 # Export results to a CSV file
 check_links --export result.csv https://example.com/
@@ -476,19 +488,21 @@ check_links --fail https://client-site.example.com/
 
 | Module | Purpose |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing. |
+| [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing (including timeout). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestrates link checking for a single page. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Loads the page and collects URLs from HTML. |
-| [`src/html_parser.zig`](src/html_parser.zig) | Lightweight HTML parser for extracting `href`/`src`. |
+| [`src/html_parser.zig`](src/html_parser.zig) | HTML parser (based on the `zigquery` library) for extracting `href`/`src`. |
 | [`src/url_normalize.zig`](src/url_normalize.zig) | URL normalization and absolute URL building. |
 | [`src/check_link_list.zig`](src/check_link_list.zig) | Batch URL checking (chunks) and grouping by code. |
 | [`src/check_http.zig`](src/check_http.zig) | Concurrent HTTP code checking. |
 | [`src/http_head_client.zig`](src/http_head_client.zig) | Custom HTTP HEAD client with TLS and timeout. |
+| [`src/request_headers.zig`](src/request_headers.zig) | Custom HTTP header parsing and same-origin policy. |
 | [`src/table_view.zig`](src/table_view.zig) | Renders results as a terminal table. |
 | [`src/export_csv.zig`](src/export_csv.zig) | Exports results to CSV. |
 | [`src/TableFormatter.zig`](src/TableFormatter.zig) | Table formatting to fit the terminal width. |
 | [`src/bar.zig`](src/bar.zig) | Progress bar for the checking process. |
 | [`src/tests.zig`](src/tests.zig) | Root test file. |
+| [`src/http_integration_test.zig`](src/http_integration_test.zig) | HTTP link-checking integration tests against a local server. |
 
 ## How It Works
 
@@ -503,7 +517,7 @@ check_links --fail https://client-site.example.com/
 Exports use the `;` delimiter. The file structure:
 
 ```
-Number;Page URL;Checked URL;HTTP code
+№;URL страницы;Проверенный URL;HTTP Код
 1;https://example.com;https://example.com/page1;200
 2;https://example.com;https://example.com/page2;404
 ```
@@ -518,7 +532,7 @@ Run all tests:
 zig build test
 ```
 
-Tests cover: HTML parsing, URL normalization, link collection from a page, HTTP code checking against a local test server (including timeouts and redirects), table formatting, and CSV export.
+Tests cover: HTML parsing (based on `zigquery`), URL normalization, link collection from a page, custom HTTP header parsing and same-origin policy, HTTP code checking against a local test server (including timeouts and redirects), table formatting, and CSV export.
 
 ## License
 
