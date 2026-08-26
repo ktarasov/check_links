@@ -9,7 +9,7 @@ const check_http = @import("check_http.zig");
 const Bar = @import("bar.zig").Bar;
 
 /// Размер чанка для пакетной обработки URL.
-pub const chunk_size: usize = 10;
+pub const chunk_size: usize = 5;
 
 /// Результат проверки списка URL: группировка URL по HTTP-коду.
 pub const CheckedList = struct {
