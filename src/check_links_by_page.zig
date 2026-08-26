@@ -22,6 +22,8 @@ pub const Options = struct {
     export_filename: ?[]const u8 = null,
     /// Пользовательские HTTP-заголовки для исходного origin.
     headers: []const std.http.Header = &.{},
+    /// Количество параллельных запросов.
+    parallels: u8 = 5,
 };
 
 /// Запускает процесс проверки ссылок на странице.
@@ -33,6 +35,9 @@ pub fn run(
     allocator: std.mem.Allocator,
     options: Options,
 ) u8 {
+    // 0. Установка количества параллельных запросов.
+    check_link_list.chunk_size = options.parallels;
+
     // 1. Сбор всех URL с указанной страницы.
     var url_list = collect_urls.collectUrls(io, allocator, options.url, options.headers) catch |err| {
         switch (err) {

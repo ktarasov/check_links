@@ -38,9 +38,16 @@ pub fn main(init: std.process.Init) !u8 {
 
     try parser.addIntOption("timeout", .{
         .short = 't',
-        .help = "Timeout in seconds",
+        .help = "Timeout in seconds (default: 15)",
         .min = 0,
         .max = 3600,
+    });
+
+    try parser.addIntOption("parallels", .{
+        .short = 'p',
+        .help = "Number of parallel requests (default: 5)",
+        .min = 1,
+        .max = 100,
     });
 
     try parser.addAppend("header", .{
@@ -78,6 +85,7 @@ pub fn main(init: std.process.Init) !u8 {
             .export_filename = result.getString("export"),
             .headers = headers.items,
             .timeout = @abs(result.getInt("timeout") orelse 15),
+            .parallels = @intCast(result.getInt("parallels") orelse 5),
         });
     } else {
         printError(io, "не указан проверяемый URL");

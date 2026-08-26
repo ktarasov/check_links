@@ -9,7 +9,7 @@ const check_http = @import("check_http.zig");
 const Bar = @import("bar.zig").Bar;
 
 /// Размер чанка для пакетной обработки URL.
-pub const chunk_size: usize = 5;
+pub var chunk_size: usize = 5;
 
 /// Результат проверки списка URL: группировка URL по HTTP-коду.
 pub const CheckedList = struct {
@@ -59,7 +59,7 @@ pub fn checkLinkList(
         allocator,
         io,
         @floatFromInt(url_list.len),
-        "Обработка: [:bar] - :current/:total - :percent% - Прошло::elapseds - Оценка::etas - Скорость::rate/s",
+        "Обработка: [:bar] - :current/:total - :percent% - Прошло::elapseds - Осталось::etas - Скорость::rate/s",
         writer,
     );
     defer progress_bar.deinit();
