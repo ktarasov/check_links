@@ -19,7 +19,7 @@
 - Нормализация относительных ссылок в абсолютные на основе базового домена (включая протокол-относительные `//`).
 - Удаление дубликатов URL.
 - Конкурентная проверка доступности каждого URL методом `HEAD` (по одному потоку на URL).
-- Пакетная обработка URL чанками по 10 (конкурентно внутри чанка, последовательно между чанками).
+- Конкурентная проверка URL партиями настраиваемого размера: количество параллельных запросов задаётся через `--parallels` (по умолчанию 5; внутри партии — конкурентно, между партиями — последовательно).
 - Собственный HTTP HEAD-клиент с поддержкой TLS и таймаута запроса (по умолчанию 15 секунд, настраивается через `--timeout`).
 - Повторяемые пользовательские HTTP-заголовки для авторизованных страниц и ссылок того же origin.
 - Группировка результатов по HTTP-коду ответа.
@@ -78,6 +78,7 @@ check_links <URL> [опции]
 | `-e`, `--export <файл>` | Экспорт результатов в CSV-файл. |
 | `-t`, `--timeout <секунды>` | Таймаут запроса в секундах (по умолчанию 15; `0` — без таймаута). |
 | `-H`, `--header <NAME: VALUE>` | Добавить HTTP-заголовок; опцию можно повторять. |
+| `-p`, `--parallels <количество>` | Количество параллельных запросов (по умолчанию 5; от 1 до 100). |
 
 ### Примеры
 
@@ -90,6 +91,9 @@ check_links --fail https://example.com/
 
 # Увеличить таймаут запроса до 60 секунд
 check_links --timeout 60 https://example.com/
+
+# Увеличить число параллельных запросов (например, до 20)
+check_links --parallels 20 https://example.com/
 
 # Экспортировать результаты в CSV-файл
 check_links --export result.csv https://example.com/
@@ -219,7 +223,7 @@ check_links --fail https://сайт-клиента.рф/
 
 | Модуль | Назначение |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов (включая таймаут). |
+| [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов (включая таймаут и число параллельных запросов). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Оркестрация проверки ссылок на одной странице. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Загрузка страницы и сбор URL из HTML. |
 | [`src/html_parser.zig`](src/html_parser.zig) | HTML-парсер (на основе библиотеки `zigquery`) для извлечения `href`/`src`. |
@@ -288,7 +292,7 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Normalizes relative links into absolute ones based on the base domain (including protocol-relative `//` links).
 - Removes duplicate URLs.
 - Concurrently checks the availability of each URL using the `HEAD` method (one thread per URL).
-- Processes URLs in chunks of 10 (concurrently within a chunk, sequentially between chunks).
+- Checks URLs concurrently in batches of a configurable size: the number of parallel requests is set via `--parallels` (default 5), concurrently within a batch and sequentially between batches.
 - Custom HTTP HEAD client with TLS support and a request timeout (15 seconds by default, configurable via `--timeout`).
 - Repeatable custom HTTP headers for authenticated pages and same-origin links.
 - Groups results by HTTP response code.
@@ -347,6 +351,7 @@ check_links <URL> [options]
 | `-e`, `--export <file>` | Export results to a CSV file. |
 | `-t`, `--timeout <seconds>` | Request timeout in seconds (default 15; `0` — no timeout). |
 | `-H`, `--header <NAME: VALUE>` | Add an HTTP header; may be repeated. |
+| `-p`, `--parallels <count>` | Number of parallel requests (default 5; from 1 to 100). |
 
 ### Examples
 
@@ -359,6 +364,9 @@ check_links --fail https://example.com/
 
 # Increase the request timeout to 60 seconds
 check_links --timeout 60 https://example.com/
+
+# Increase the number of parallel requests (e.g., to 20)
+check_links --parallels 20 https://example.com/
 
 # Export results to a CSV file
 check_links --export result.csv https://example.com/
@@ -488,7 +496,7 @@ check_links --fail https://client-site.example.com/
 
 | Module | Purpose |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing (including timeout). |
+| [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing (including timeout and the number of parallel requests). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestrates link checking for a single page. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Loads the page and collects URLs from HTML. |
 | [`src/html_parser.zig`](src/html_parser.zig) | HTML parser (based on the `zigquery` library) for extracting `href`/`src`. |
