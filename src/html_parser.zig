@@ -73,6 +73,8 @@ pub fn parse(allocator: std.mem.Allocator, html: []const u8) !ParseResult {
     while (it_a.next()) |el_a| {
         const attr_href = el_a.attr("href");
         if (attr_href) |href| {
+            std.debug.print("parse: href={s}\n", .{href});
+            for (el_a.nodes[0].attr) |at| std.debug.print("\t- {s} = {s}\n", .{ at.key, at.val });
             try result.append(href);
         }
     }

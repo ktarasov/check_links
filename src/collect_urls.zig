@@ -29,9 +29,6 @@ pub fn collectUrls(
     url: []const u8,
     headers: []const std.http.Header,
 ) !std.ArrayList([]const u8) {
-    const domain_url = try url_normalize.makeDomainUrl(allocator, url);
-    defer allocator.free(domain_url);
-
     const html = try loadDocument(io, allocator, url, headers);
     defer allocator.free(html);
 
@@ -44,7 +41,7 @@ pub fn collectUrls(
     // Собираем URL из тегов <a> и <img>.
     var parsed_it = parsed.iterator();
     while (parsed_it.next()) |raw| {
-        if (try url_normalize.normalizeUrl(allocator, domain_url, raw)) |normalized| {
+        if (try url_normalize.normalizeUrl(allocator, url, raw)) |normalized| {
             if (!try appendUnique(allocator, &result, normalized)) {
                 allocator.free(normalized);
             }

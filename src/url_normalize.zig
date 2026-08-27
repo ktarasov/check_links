@@ -1,7 +1,7 @@
 //! Нормализация URL-адресов.
 //!
 //! Содержит функции для построения базового доменного URL из полного URL (`makeDomainUrl`)
-//! и нормализации относительных ссылок в абсолютные (`normalizeUrl`).
+//! и нормализации ссылок в абсолютные на основе базового URL страницы (`normalizeUrl`).
 
 const std = @import("std");
 
@@ -37,18 +37,22 @@ pub fn makeDomainUrl(allocator: std.mem.Allocator, url: []const u8) ![]const u8 
     return result.toOwnedSlice(allocator);
 }
 
-/// Нормализует URL-адрес, извлечённый из атрибута `href`/`src`.
+/// Нормализует ссылку, извлечённую из атрибута `href`/`src`, в абсолютный URL.
 ///
-/// Аналог PHP-функции `normalizeUrl`. Возвращает `null`, если URL пустой
-/// или начинается с `mailto:`/`tel:`. Относительные ссылки (`/`, `#`)
-/// преобразуются в абсолютные на основе `domain_url`. Протокол-относительные
-/// ссылки (`//`) дополняются схемой `https:`.
+/// Аналог PHP-функции `normalizeUrl`. Возвращает `null`, если URL пустой,
+/// начинается с `mailto:`/`tel:` или не может быть разобран/разрешён.
+///
+/// Относительная ссылка (`books/...`, `/path`, `../up`, `./same`, `#anchor`,
+/// `?query`) разрешается в абсолютную относительно полного базового URL страницы
+/// `base_url` по алгоритму RFC 3986 (Section 5). Протокол-относительные ссылки
+/// (`//host/...`) наследуют схему из `base_url`. Абсолютные ссылки (включая
+/// `data:`) возвращаются без изменений.
 ///
 /// `allocator` используется для выделения результирующей строки.
 /// Возвращаемая строка принадлежит вызывающему коду.
 pub fn normalizeUrl(
     allocator: std.mem.Allocator,
-    domain_url: []const u8,
+    base_url: []const u8,
     url: []const u8,
 ) !?[]const u8 {
     if (url.len == 0) return null;
@@ -57,22 +61,86 @@ pub fn normalizeUrl(
     if (trimmed.len == 0) return null;
     if (std.mem.startsWith(u8, trimmed, "mailto:")) return null;
     if (std.mem.startsWith(u8, trimmed, "tel:")) return null;
+    if (std.mem.startsWith(u8, trimmed, "data:")) return null;
 
-    const result: []const u8 = trimmed;
+    return resolveAgainstBase(allocator, base_url, trimmed) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        // Нерезолвимую/невалидную ссылку пропускаем (не включаем в список).
+        else => return null,
+    };
+}
 
-    if (std.mem.startsWith(u8, result, "//")) {
-        // Протокол-относительная ссылка: дополняем схемой https.
-        const full = try std.fmt.allocPrint(allocator, "https:{s}", .{result});
-        return full;
-    } else if (std.mem.startsWith(u8, result, "/") or std.mem.startsWith(u8, result, "#")) {
-        // Относительная ссылка: склеиваем с базовым доменом.
-        const full = try std.fmt.allocPrint(allocator, "{s}{s}", .{ domain_url, result });
-        return full;
+/// Разрешает ссылку `ref` относительно базового URL `base_url` по RFC 3986.
+///
+/// Внутри используется `std.Uri.resolveInPlace`: ссылка копируется во
+/// вспомогательный буфер, разрешается относительно базы, а результат
+/// рендерится в новую выделенную строку. Возвращаемая строка принадлежит
+/// вызывающему коду.
+fn resolveAgainstBase(
+    allocator: std.mem.Allocator,
+    base_url: []const u8,
+    ref: []const u8,
+) ![]const u8 {
+    const base = try std.Uri.parse(base_url);
+
+    // Во вспомогательный буфер копируется `ref`, а при необходимости
+    // (merge_paths) туда же дописывается объединённый путь. Размера
+    // ref + base_url достаточно, т.к. объединённый путь не длиннее их суммы.
+    const buf = try allocator.alloc(u8, ref.len + base_url.len + 16);
+    defer allocator.free(buf);
+
+    var aux: []u8 = buf;
+    @memcpy(aux[0..ref.len], ref);
+
+    // После вызова компоненты `resolved` указывают в `buf`, поэтому
+    // буфер должен оставаться живым до завершения рендера ниже.
+    const resolved = try base.resolveInPlace(ref.len, &aux);
+
+    var out = std.ArrayList(u8).empty;
+    errdefer out.deinit(allocator);
+    var allocating = std.Io.Writer.Allocating.fromArrayList(allocator, &out);
+    defer allocating.deinit();
+
+    try renderUri(&allocating.writer, resolved);
+
+    out = allocating.toArrayList();
+    // std.debug.print("\x1b[0;36mBaseUrl:\x1b[0m {s}, \x1b[0;36mRef:\x1b[0m {s}, \x1b[0;36mResolved:\x1b[0m {s}\n", .{ base_url, ref, out.items });
+
+    return out.toOwnedSlice(allocator);
+}
+
+/// Рендерит URI в writer. Аналог `std.Uri.writeToStream`, но для схемы
+/// `file:` всегда выводит пустой authority (`file://`), сохраняя каноническую
+/// форму `file:///путь`.
+fn renderUri(w: *std.Io.Writer, uri: std.Uri) !void {
+    if (uri.scheme.len != 0) {
+        try w.print("{s}:", .{uri.scheme});
+        if (uri.host != null or std.mem.eql(u8, uri.scheme, "file")) {
+            try w.writeAll("//");
+        }
     }
-
-    // Абсолютная ссылка: возвращаем как есть (уже обрезанную).
-    const duped = try allocator.dupe(u8, result);
-    return @as(?[]const u8, duped);
+    if (uri.host) |host| {
+        if (uri.user) |user| {
+            try user.formatUser(w);
+            if (uri.password) |password| {
+                try w.writeByte(':');
+                try password.formatPassword(w);
+            }
+            try w.writeByte('@');
+        }
+        try host.formatHost(w);
+        if (uri.port) |port| try w.print(":{d}", .{port});
+    }
+    const uri_path: std.Uri.Component = if (uri.path.isEmpty()) .{ .percent_encoded = "/" } else uri.path;
+    try uri_path.formatPath(w);
+    if (uri.query) |query| {
+        try w.writeByte('?');
+        try query.formatQuery(w);
+    }
+    if (uri.fragment) |fragment| {
+        try w.writeByte('#');
+        try fragment.formatFragment(w);
+    }
 }
 
 test "makeDomainUrl: полный URL со схемой, хостом и портом" {
@@ -105,31 +173,55 @@ test "makeDomainUrl: невалидный URL возвращает пустую 
 
 test "normalizeUrl: абсолютный URL возвращается без изменений" {
     const allocator = std.testing.allocator;
-    const result = (try normalizeUrl(allocator, "https://example.com", "https://other.com/page")) orelse
+    const result = (try normalizeUrl(allocator, "https://example.com/page", "https://other.com/page")) orelse
         return error.TestUnexpectedNull;
     defer allocator.free(result);
     try std.testing.expectEqualStrings("https://other.com/page", result);
 }
 
-test "normalizeUrl: относительный путь склеивается с доменом" {
+test "normalizeUrl: относительный путь с ведущим слешем склеивается с корнем домена" {
     const allocator = std.testing.allocator;
-    const result = (try normalizeUrl(allocator, "https://example.com", "/relative/page")) orelse
+    const result = (try normalizeUrl(allocator, "https://example.com/docs/page", "/relative/page")) orelse
         return error.TestUnexpectedNull;
     defer allocator.free(result);
     try std.testing.expectEqualStrings("https://example.com/relative/page", result);
 }
 
-test "normalizeUrl: якорь склеивается с доменом" {
+test "normalizeUrl: относительный путь без ведущего слеша резолвится от корня" {
     const allocator = std.testing.allocator;
-    const result = (try normalizeUrl(allocator, "https://example.com", "#anchor")) orelse
+    const result = (try normalizeUrl(allocator, "https://example.com/", "books/learning-zig/chapter11/")) orelse
         return error.TestUnexpectedNull;
     defer allocator.free(result);
-    try std.testing.expectEqualStrings("https://example.com#anchor", result);
+    try std.testing.expectEqualStrings("https://example.com/books/learning-zig/chapter11/", result);
 }
 
-test "normalizeUrl: протокол-относительная ссылка дополняется https" {
+test "normalizeUrl: относительный путь резолвится от подпути текущей страницы" {
     const allocator = std.testing.allocator;
-    const result = (try normalizeUrl(allocator, "https://example.com", "//cdn.example.com/img.png")) orelse
+    const result = (try normalizeUrl(allocator, "https://example.com/docs/index.html", "books/learning-zig/")) orelse
+        return error.TestUnexpectedNull;
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("https://example.com/docs/books/learning-zig/", result);
+}
+
+test "normalizeUrl: восходящий переход ../ обрабатывается" {
+    const allocator = std.testing.allocator;
+    const result = (try normalizeUrl(allocator, "https://example.com/a/b/c/page", "../other")) orelse
+        return error.TestUnexpectedNull;
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("https://example.com/a/b/other", result);
+}
+
+test "normalizeUrl: якорь резолвится относительно текущей страницы" {
+    const allocator = std.testing.allocator;
+    const result = (try normalizeUrl(allocator, "https://example.com/docs/page", "#anchor")) orelse
+        return error.TestUnexpectedNull;
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("https://example.com/docs/page#anchor", result);
+}
+
+test "normalizeUrl: протокол-относительная ссылка наследует схему базы" {
+    const allocator = std.testing.allocator;
+    const result = (try normalizeUrl(allocator, "https://example.com/page", "//cdn.example.com/img.png")) orelse
         return error.TestUnexpectedNull;
     defer allocator.free(result);
     try std.testing.expectEqualStrings("https://cdn.example.com/img.png", result);
@@ -155,10 +247,8 @@ test "normalizeUrl: tel возвращает null" {
 
 test "normalizeUrl: data URI возвращается как есть" {
     const allocator = std.testing.allocator;
-    const result = (try normalizeUrl(allocator, "https://example.com", "data:image/png;base64,iVBORw0KGgo=")) orelse
-        return error.TestUnexpectedNull;
-    defer allocator.free(result);
-    try std.testing.expectEqualStrings("data:image/png;base64,iVBORw0KGgo=", result);
+    const result = (try normalizeUrl(allocator, "https://example.com", "data:image/png;base64,iVBORw0KGgo="));
+    try std.testing.expect(result == null);
 }
 
 test "normalizeUrl: URL с пробелами обрезается" {
