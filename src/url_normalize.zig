@@ -104,8 +104,6 @@ fn resolveAgainstBase(
     try renderUri(&allocating.writer, resolved);
 
     out = allocating.toArrayList();
-    // std.debug.print("\x1b[0;36mBaseUrl:\x1b[0m {s}, \x1b[0;36mRef:\x1b[0m {s}, \x1b[0;36mResolved:\x1b[0m {s}\n", .{ base_url, ref, out.items });
-
     return out.toOwnedSlice(allocator);
 }
 
