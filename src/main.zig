@@ -108,6 +108,6 @@ fn printHeaderError(io: Io, err: anyerror) void {
 fn printError(io: Io, message: []const u8) void {
     var buffer: [1024]u8 = undefined;
     var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("Ошибка: {s}\n", .{message}) catch {};
+    writer.interface.print("\x1b[0;31mОшибка:\x1b[0m {s}\n", .{message}) catch {};
     writer.flush() catch {};
 }

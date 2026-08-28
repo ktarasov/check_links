@@ -96,7 +96,7 @@ pub fn run(
 fn printError(io: std.Io, comptime fmt: []const u8, args: anytype) void {
     var buffer: [4096]u8 = undefined;
     var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("Ошибка: " ++ fmt ++ "\n", args) catch {};
+    writer.interface.print("\x1b[0;31mОшибка:\x1b[0m " ++ fmt ++ "\n", args) catch {};
     writer.flush() catch {};
 }
 
@@ -104,6 +104,6 @@ fn printError(io: std.Io, comptime fmt: []const u8, args: anytype) void {
 fn printWarning(io: std.Io, comptime fmt: []const u8, args: anytype) void {
     var buffer: [4096]u8 = undefined;
     var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("Предупреждение: " ++ fmt ++ "\n", args) catch {};
+    writer.interface.print("\x1b[0;33mПредупреждение:\x1b[0m " ++ fmt ++ "\n", args) catch {};
     writer.flush() catch {};
 }
