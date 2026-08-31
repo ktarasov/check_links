@@ -93,7 +93,7 @@ pub fn build(b: *std.Build) void {
         for (release_targets) |release_target| {
             const resolved_target = b.resolveTargetQuery(release_target);
             const exe_release = b.addExecutable(.{
-                .name = "love",
+                .name = "check_links",
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/main.zig"),
                     .target = resolved_target,
@@ -101,6 +101,9 @@ pub fn build(b: *std.Build) void {
                     .imports = &.{},
                 }),
             });
+
+            exe_release.root_module.addImport("args", args_dep.module("args"));
+            exe_release.root_module.addImport("zigquery", zigquery.module("zigquery"));
 
             const is_windows = release_target.os_tag == .windows;
             const exe_name = b.fmt("{s}{s}", .{ exe.name, resolved_target.result.exeFileExt() });
