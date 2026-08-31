@@ -37,8 +37,8 @@
             .hash = "args-0.0.9-8hzgbh4KCgB9UYVNvr6R_GmZgq7j1DpV2kGcqn3F36Q1",
         },
         .zigquery = .{
-            .url = "git+https://github.com/OrlovEvgeny/zigquery#fba335af7dcf1fe63501455413ddd07f4433b357",
-            .hash = "zigquery-0.2.0-z2TOzWicAgAtAUQGDHZjUgbK0AXmy6YVKobvfTUZUusj",
+            .url = "git+https://github.com/OrlovEvgeny/zigquery#eaaef49bc40ea6450a39f35e409dc69347cad80e",
+            .hash = "zigquery-0.2.0-z2TOzdiiAgDmLcE6UASPQz0nsgLepQM-9Uk-2dmP45GK",
         },
     },
     .paths = .{
