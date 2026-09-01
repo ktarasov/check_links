@@ -1,6 +1,6 @@
 # Описание релиза: v1.0.0
 
-Первый стабильный релиз утилиты **Check Links**.
+Первый стабильный релиз утилиты **CheckLinks**.
 
 ## Новые возможности
 
@@ -24,7 +24,7 @@
 
 # Release Notes: v1.0.0
 
-The first stable release of the **Check Links** utility.
+The first stable release of the **CheckLinks** utility.
 
 ## New Features
 

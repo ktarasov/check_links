@@ -1,4 +1,4 @@
-# Check Links
+# CheckLinks
 
 [Read this document in English](#english) — английская версия документа находится ниже.
 
@@ -6,7 +6,7 @@
 
 ## О проекте
 
-**Check Links** — консольная утилита (CLI) на языке **Zig** для проверки ссылок на веб-странице.
+**CheckLinks** — консольная утилита (CLI) на языке **Zig** для проверки ссылок на веб-странице.
 
 Утилита загружает HTML-страницу по указанному URL, собирает все ссылки (`<a href>`) и изображения (`<img src>`), а затем проверяет каждый URL на доступность. Результат выводится на экран в виде таблицы или экспортируется в CSV-файл.
 
@@ -295,7 +295,7 @@ zig build test
 
 ## About
 
-**Check Links** is a command-line utility (CLI) written in **Zig** for checking links on a web page.
+**CheckLinks** is a command-line utility (CLI) written in **Zig** for checking links on a web page.
 
 The utility loads the HTML page at the given URL, collects all links (`<a href>`) and images (`<img src>`), and then checks each URL for availability. The results are displayed on the screen as a table or exported to a CSV file.
 

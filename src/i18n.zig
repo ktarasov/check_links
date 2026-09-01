@@ -64,7 +64,7 @@ pub const Messages = struct {
 /// Русская локаль (по умолчанию).
 pub const ru: Messages = .{
     .desc =
-    \\Проверка ссылок
+    \\CheckLinks
     \\
     \\Утилита CLI для проверки ссылок на веб-странице. Загружает HTML-страницу
     \\по указанному URL, собирает все ссылки (<a href>) и изображения (<img src>),
@@ -118,7 +118,7 @@ pub const ru: Messages = .{
 /// Английская локаль.
 pub const en: Messages = .{
     .desc =
-    \\Check Links
+    \\CheckLinks
     \\
     \\A CLI utility for checking links on a web page. It loads the HTML page
     \\at the specified URL, collects all links (<a href>) and images (<img src>),
