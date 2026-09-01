@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .args = .{
-            .url = "git+https://github.com/ktarasov/args.zig.git#f25fe49c0f6690c37fad8bcceed57ebc48a5df8a",
-            .hash = "args-0.0.9-8hzgbr0PCgAn5Ql0wHNoH8bkrcobZpGIVmkWyaa_pR_s",
+            .url = "git+https://github.com/ktarasov/args.zig.git#516fec4d433c92e7fa65993488f813e1a60cf014",
+            .hash = "args-0.0.9-8hzgbvcTCgD5Of-ObTT1PUJiSOhPbIW5Hx4IVDdYKUOo",
         },
         .zigquery = .{
             .url = "git+https://github.com/OrlovEvgeny/zigquery#eaaef49bc40ea6450a39f35e409dc69347cad80e",
