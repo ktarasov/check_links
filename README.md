@@ -30,6 +30,7 @@
 - Экспорт результатов в CSV-файл (разделитель `;`).
 - Режим «только ошибки» — показывать лишь упавшие ссылки.
 - Индикатор прогресса выполнения проверки.
+- Интернационализация интерфейса: справка CLI, сообщения об ошибках и предупреждениях, заголовки таблицы и CSV, а также шаблон прогресс-бара собираются на русском или английском языке через build-опцию `-Dlocale` (по умолчанию `ru`).
 
 ## Требования
 
@@ -53,6 +54,8 @@ zig build
 | `zig build run -- <аргументы>` | Сборка и запуск утилиты. |
 | `zig build test` | Запуск всех тестов. |
 | `zig build release` | Сборка релизных бинарных файлов (сжатые архивы) для нескольких платформ. |
+| `zig build -Dlocale=ru` | Сборка с русским интерфейсом (по умолчанию). |
+| `zig build -Dlocale=en` | Сборка с английским интерфейсом. |
 
 ### Поддерживаемые платформы для релизной сборки
 
@@ -62,6 +65,17 @@ zig build
 - `x86_64-windows` (архив `.zip`)
 - `x86_64-macos`
 - `aarch64-macos`
+
+### Локализация
+
+Интерфейс утилиты (справка CLI, сообщения об ошибках и предупреждениях, заголовки таблицы и CSV, шаблон прогресс-бара) можно собирать на русском или английском языке. Язык задаётся на этапе сборки через build-опцию `-Dlocale` (по умолчанию — русский):
+
+```sh
+zig build -Dlocale=ru   # русский интерфейс (по умолчанию)
+zig build -Dlocale=en   # английский интерфейс
+```
+
+Тексты локализации хранятся в типизированном каталоге [`src/i18n.zig`](src/i18n.zig); полнота ключей для каждого языка гарантируется компилятором.
 
 ## Использование
 
@@ -224,6 +238,8 @@ check_links --fail https://сайт-клиента.рф/
 | Модуль | Назначение |
 | --- | --- |
 | [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов (включая таймаут и число параллельных запросов). |
+| [`src/i18n.zig`](src/i18n.zig) | Типизированный каталог локализованных сообщений (`ru`/`en`) и выбор активной локали через `-Dlocale`. |
+| [`src/lang.zig`](src/lang.zig) | Перечисление поддерживаемых языков интерфейса (используется сборкой). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Оркестрация проверки ссылок на одной странице. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Загрузка страницы и сбор URL из HTML. |
 | [`src/html_parser.zig`](src/html_parser.zig) | HTML-парсер (на основе библиотеки `zigquery`) для извлечения `href`/`src`. |
@@ -303,6 +319,7 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Exports results to a CSV file (delimiter `;`).
 - "Errors only" mode — shows only failed links.
 - Progress bar for the checking process.
+- UI localization: CLI help, error and warning messages, table and CSV headers, and the progress-bar template can be built in Russian or English via the `-Dlocale` build option (default `ru`).
 
 ## Requirements
 
@@ -326,6 +343,8 @@ The binary will be placed in `zig-out/bin/`.
 | `zig build run -- <arguments>` | Builds and runs the utility. |
 | `zig build test` | Runs all tests. |
 | `zig build release` | Builds release binaries (compressed archives) for multiple platforms. |
+| `zig build -Dlocale=ru` | Builds the Russian UI (default). |
+| `zig build -Dlocale=en` | Builds the English UI. |
 
 ### Supported Release Platforms
 
@@ -335,6 +354,17 @@ The binary will be placed in `zig-out/bin/`.
 - `x86_64-windows` (`.zip` archive)
 - `x86_64-macos`
 - `aarch64-macos`
+
+### Localization
+
+The utility UI (CLI help, error and warning messages, table and CSV headers, progress-bar template) can be built in Russian or English. The language is selected at build time via the `-Dlocale` build option (default — Russian):
+
+```sh
+zig build -Dlocale=ru   # Russian UI (default)
+zig build -Dlocale=en   # English UI
+```
+
+Localized strings live in the typed catalog [`src/i18n.zig`](src/i18n.zig); key completeness for each language is guaranteed by the compiler.
 
 ## Usage
 
@@ -497,6 +527,8 @@ check_links --fail https://client-site.example.com/
 | Module | Purpose |
 | --- | --- |
 | [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing (including timeout and the number of parallel requests). |
+| [`src/i18n.zig`](src/i18n.zig) | Typed catalog of localized messages (`ru`/`en`) and active-locale selection via `-Dlocale`. |
+| [`src/lang.zig`](src/lang.zig) | Enum of supported UI languages (used by the build). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestrates link checking for a single page. |
 | [`src/collect_urls.zig`](src/collect_urls.zig) | Loads the page and collects URLs from HTML. |
 | [`src/html_parser.zig`](src/html_parser.zig) | HTML parser (based on the `zigquery` library) for extracting `href`/`src`. |
