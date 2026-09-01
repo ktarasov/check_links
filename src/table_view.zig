@@ -12,6 +12,7 @@
 const std = @import("std");
 const check_link_list = @import("check_link_list.zig");
 const TableFormatter = @import("TableFormatter.zig");
+const i18n = @import("i18n.zig");
 const Colors = TableFormatter.Colors;
 
 /// Выводит таблицу результатов проверки ссылок в stdout.
@@ -27,7 +28,7 @@ pub fn renderTableView(
     fail: bool,
 ) !void {
     if (checked_list.groups.items.len == 0) {
-        try printLineFmt(io, "Передан пустой список проверенных ссылок", .{});
+        try printLineFmt(io, i18n.Current.msg_empty_list, .{});
         return;
     }
 
@@ -56,7 +57,12 @@ pub fn renderTableView(
     printLn(io, line_separator, true);
     const table_title = try tf.format(
         &line_format,
-        &[_][]const u8{ " № ", "URL страницы", "Проверенный URL", "HTTP Код" },
+        &[_][]const u8{
+            i18n.Current.col_num,
+            i18n.Current.col_page_url,
+            i18n.Current.col_checked_url,
+            i18n.Current.col_http_code,
+        },
         &.{},
     );
     printLn(io, table_title, false);

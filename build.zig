@@ -30,6 +30,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const lang = @import("src/lang.zig");
+
+    // Локаль интерфейса: -Dlocale=ru|en (по умолчанию ru).
+    const locale_option = b.option(lang.Lang, "locale", "UI language (ru|en)") orelse .ru;
+
+    const build_options = b.addOptions();
+    build_options.addOption(lang.Lang, "locale", locale_option);
+
     // 1. Add args.zig as a dependency
     const args_dep = b.dependency("args", .{
         .target = target,
@@ -53,6 +61,7 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("args", args_dep.module("args"));
     exe.root_module.addImport("zigquery", zigquery.module("zigquery"));
+    exe.root_module.addOptions("build_options", build_options);
 
     b.installArtifact(exe);
 
@@ -78,6 +87,7 @@ pub fn build(b: *std.Build) void {
     });
 
     tests_mod.addImport("zigquery", zigquery.module("zigquery"));
+    tests_mod.addOptions("build_options", build_options);
 
     const exe_tests = b.addTest(.{
         .root_module = tests_mod,
@@ -90,65 +100,73 @@ pub fn build(b: *std.Build) void {
     { // zig build release
         const release_step = b.step("release", "Build release binaries");
         const install_dir: std.Build.InstallDir = .{ .custom = "compressed" };
-        for (release_targets) |release_target| {
-            const resolved_target = b.resolveTargetQuery(release_target);
-            const exe_release = b.addExecutable(.{
-                .name = "check_links",
-                .root_module = b.createModule(.{
-                    .root_source_file = b.path("src/main.zig"),
-                    .target = resolved_target,
-                    .optimize = .ReleaseSmall,
-                    .imports = &.{},
-                }),
-            });
-
-            exe_release.root_module.addImport("args", args_dep.module("args"));
-            exe_release.root_module.addImport("zigquery", zigquery.module("zigquery"));
-
-            const is_windows = release_target.os_tag == .windows;
-            const exe_name = b.fmt("{s}{s}", .{ exe.name, resolved_target.result.exeFileExt() });
-
-            // An array has been created for possible extensions to new types of archives.
-            const extensions: []const FileExtension = if (is_windows) &.{.zip} else &.{.@"tar.gz"};
-            var file_path: std.Build.LazyPath = undefined;
-            for (extensions) |extension| {
-                // archive file name
-                const file_name = b.fmt("check_links-{t}-{t}.{t}", .{
-                    resolved_target.result.cpu.arch,
-                    resolved_target.result.os.tag,
-                    extension,
+        const release_locales = [_]lang.Lang{ .ru, .en };
+        for (release_locales) |locale| {
+            for (release_targets) |release_target| {
+                const resolved_target = b.resolveTargetQuery(release_target);
+                const exe_release = b.addExecutable(.{
+                    .name = "check_links",
+                    .root_module = b.createModule(.{
+                        .root_source_file = b.path("src/main.zig"),
+                        .target = resolved_target,
+                        .optimize = .ReleaseSmall,
+                        .imports = &.{},
+                    }),
                 });
 
-                // creating a command inside the project build step
-                const compress_cmd = std.Build.Step.Run.create(b, "compress artifact");
-                // init command properties
-                compress_cmd.clearEnvironment();
-                compress_cmd.step.max_rss = 16 * 1024 * 1024; // 16 MiB
+                exe_release.root_module.addImport("args", args_dep.module("args"));
+                exe_release.root_module.addImport("zigquery", zigquery.module("zigquery"));
 
-                // Building the compress command line
-                switch (extension) {
-                    .zip => {
-                        compress_cmd.addArgs(&.{ "7z", "a", "-mx=9" });
-                        file_path = compress_cmd.addOutputFileArg(file_name);
-                        compress_cmd.addArtifactArg(exe_release);
-                    },
-                    .@"tar.gz" => {
-                        compress_cmd.addArgs(&.{ "tar", "caf" });
-                        file_path = compress_cmd.addOutputFileArg(file_name);
-                        compress_cmd.addPrefixedDirectoryArg("-C", exe_release.getEmittedBinDirectory());
-                        compress_cmd.addArg(exe_name);
-                        compress_cmd.addArgs(&.{
-                            "--sort=name",
-                            "--numeric-owner",
-                            "--owner=0",
-                            "--group=0",
-                        });
-                    },
+                const build_release_options = b.addOptions();
+                build_release_options.addOption(lang.Lang, "locale", locale);
+                exe_release.root_module.addOptions("build_options", build_release_options);
+
+                const is_windows = release_target.os_tag == .windows;
+                const exe_name = b.fmt("{s}{s}", .{ exe.name, resolved_target.result.exeFileExt() });
+
+                // An array has been created for possible extensions to new types of archives.
+                const extensions: []const FileExtension = if (is_windows) &.{.zip} else &.{.@"tar.gz"};
+                var file_path: std.Build.LazyPath = undefined;
+                for (extensions) |extension| {
+                    // archive file name
+                    const file_name = b.fmt("check_links-{t}-{t}-{t}.{t}", .{
+                        resolved_target.result.cpu.arch,
+                        resolved_target.result.os.tag,
+                        locale,
+                        extension,
+                    });
+
+                    // creating a command inside the project build step
+                    const compress_cmd = std.Build.Step.Run.create(b, "compress artifact");
+                    // init command properties
+                    compress_cmd.clearEnvironment();
+                    compress_cmd.step.max_rss = 16 * 1024 * 1024; // 16 MiB
+
+                    // Building the compress command line
+                    switch (extension) {
+                        .zip => {
+                            compress_cmd.addArgs(&.{ "7z", "a", "-mx=9" });
+                            file_path = compress_cmd.addOutputFileArg(file_name);
+                            compress_cmd.addArtifactArg(exe_release);
+                        },
+                        .@"tar.gz" => {
+                            compress_cmd.addArgs(&.{ "tar", "caf" });
+                            file_path = compress_cmd.addOutputFileArg(file_name);
+                            compress_cmd.addPrefixedDirectoryArg("-C", exe_release.getEmittedBinDirectory());
+                            compress_cmd.addArg(exe_name);
+                            compress_cmd.addArgs(&.{
+                                "--sort=name",
+                                "--numeric-owner",
+                                "--owner=0",
+                                "--group=0",
+                            });
+                        },
+                    }
+
+                    // The artifact install to zig-out/compressed directory
+                    const install_compressed = b.addInstallFileWithDir(file_path, install_dir, file_name);
+                    release_step.dependOn(&install_compressed.step);
                 }
-
-                // The artifact install to zig-out/compressed directory
-                const install_compressed = b.addInstallFileWithDir(file_path, install_dir, file_name);
-                release_step.dependOn(&install_compressed.step);
             }
         }
     }

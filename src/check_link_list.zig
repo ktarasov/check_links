@@ -6,6 +6,7 @@
 
 const std = @import("std");
 const check_http = @import("check_http.zig");
+const i18n = @import("i18n.zig");
 const Bar = @import("bar.zig").Bar;
 
 /// Размер чанка для пакетной обработки URL.
@@ -59,7 +60,7 @@ pub fn checkLinkList(
         allocator,
         io,
         @floatFromInt(url_list.len),
-        "Обработка: [:bar] - :current/:total - :percent% - Прошло::elapseds - Осталось::etas - Скорость::rate/s",
+        i18n.Current.progress_template,
         writer,
     );
     defer progress_bar.deinit();

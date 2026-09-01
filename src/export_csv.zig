@@ -6,6 +6,7 @@
 
 const std = @import("std");
 const check_link_list = @import("check_link_list.zig");
+const i18n = @import("i18n.zig");
 
 /// Экспортирует результаты проверки ссылок в CSV-файл.
 ///
@@ -54,7 +55,7 @@ pub fn exportCsv(
     var buffer: [4096]u8 = undefined;
     var writer = file.writer(io, &buffer);
 
-    try writer.interface.print("№;URL страницы;Проверенный URL;HTTP Код\n", .{});
+    try writer.interface.print("{s}\n", .{i18n.Current.csv_header});
     try writer.flush();
 
     var line_number: usize = 1;
