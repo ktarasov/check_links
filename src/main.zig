@@ -18,7 +18,7 @@ pub fn main(init: std.process.Init) !u8 {
         _ = SetConsoleOutputCP(CP_UTF8);
     }
 
-    var parser = try args.ArgumentParser.init(arena, .{
+    var parser = args.ArgumentParser.init(arena, .{
         .name = "check_links",
         .version = "1.0.0",
         .description = i18n.Current.desc,
@@ -34,6 +34,8 @@ pub fn main(init: std.process.Init) !u8 {
             .custom_help_strings = .{
                 .usage_label = i18n.Current.usage,
                 .arguments_label = i18n.Current.arguments,
+                .commands_label = i18n.Current.commands,
+                .command_tag = i18n.Current.command_tag,
                 .options_label = i18n.Current.options,
                 .options_tag = i18n.Current.options_tag,
                 .required_annotation = i18n.Current.required,
@@ -42,45 +44,74 @@ pub fn main(init: std.process.Init) !u8 {
                 .default_label = i18n.Current.default,
             },
         },
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00001");
+        return 1;
+    };
     defer parser.deinit();
 
-    try parser.addFlag("fail", .{
+    parser.addFlag("fail", .{
         .short = 'f',
         .help = i18n.Current.help_fail,
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00002");
+        return 1;
+    };
 
-    try parser.addFileOption("export", .{
+    parser.addFileOption("export", .{
         .short = 'e',
         .help = i18n.Current.help_export,
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00003");
+        return 1;
+    };
 
-    try parser.addIntOption("timeout", .{
+    parser.addIntOption("timeout", .{
         .short = 't',
         .help = i18n.Current.help_timeout,
         .min = 0,
         .max = 3600,
         .default = "15",
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00004");
+        return 1;
+    };
 
-    try parser.addIntOption("parallels", .{
+    parser.addIntOption("parallels", .{
         .short = 'p',
         .help = i18n.Current.help_parallels,
         .min = 1,
         .max = 100,
         .default = "5",
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00005");
+        return 1;
+    };
 
-    try parser.addAppend("header", .{
+    parser.addAppend("header", .{
         .short = 'H',
         .metavar = "NAME: VALUE",
         .help = i18n.Current.help_header,
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00006");
+        return 1;
+    };
 
-    try parser.addPositional("url", .{
+    parser.addPositional("url", .{
         .help = i18n.Current.help_url,
         .required = true,
-    });
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00007");
+        return 1;
+    };
+
+    parser.addSubcommand(.{
+        .name = "completion",
+        .help = i18n.Current.completion,
+    }) catch {
+        printError(io, i18n.Current.err_init_parser ++ "00008");
+        return 1;
+    };
 
     var result = parser.parseProcess(init) catch |err| {
         const message = switch (err) {
@@ -91,6 +122,29 @@ pub fn main(init: std.process.Init) !u8 {
         return 1;
     };
     defer result.deinit();
+
+    // Если выбран подкоманда completion, то генерируем скрипт для автозавершения и выходим
+    if (result.subcommand) |cmd| {
+        if (std.mem.eql(u8, cmd, "completion")) {
+            if (detectShell(init.environ_map)) |shell| {
+                const script = parser.generateCompletion(shell) catch {
+                    printError(io, i18n.Current.err_generate_completion);
+                    return 1;
+                };
+                defer arena.free(script);
+
+                var stdout = std.Io.File.stdout().writer(io, &.{});
+                stdout.interface.writeAll(script) catch {
+                    printError(io, i18n.Current.err_generate_completion);
+                    return 1;
+                };
+                return 0;
+            } else {
+                printError(io, i18n.Current.err_no_shell);
+                return 1;
+            }
+        }
+    }
 
     const raw_headers = result.getArray("header") orelse &.{};
     var headers = request_headers.parse(arena, raw_headers) catch |err| {
@@ -112,6 +166,16 @@ pub fn main(init: std.process.Init) !u8 {
         printError(io, i18n.Current.err_no_url);
         return 1;
     }
+}
+
+fn detectShell(env: *std.process.Environ.Map) ?args.Shell {
+    if (env.get("SHELL")) |shell_path| {
+        if (std.mem.endsWith(u8, shell_path, "bash")) return .bash;
+        if (std.mem.endsWith(u8, shell_path, "zsh")) return .zsh;
+        if (std.mem.endsWith(u8, shell_path, "fish")) return .fish;
+        if (std.mem.endsWith(u8, shell_path, "nushell")) return .nushell;
+    }
+    return null;
 }
 
 fn printHeaderError(io: Io, err: anyerror) void {
