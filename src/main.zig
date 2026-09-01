@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !u8 {
 
     var parser = try args.ArgumentParser.init(arena, .{
         .name = "check_links",
-        .version = "0.0.1",
+        .version = "1.0.0",
         .description = i18n.Current.desc,
         .config = .{
             .allow_negated_flags = false,
