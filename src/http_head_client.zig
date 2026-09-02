@@ -254,12 +254,14 @@ fn initTls(
         &stream_writer.interface,
         .{
             .host = .{ .explicit = host },
-            .ca = .{ .bundle = .{
-                .gpa = self.allocator,
-                .io = self.io,
-                .lock = &self.ca_bundle_lock,
-                .bundle = &self.ca_bundle,
-            } },
+            .ca = .{
+                .bundle = .{
+                    .gpa = self.allocator,
+                    .io = self.io,
+                    .lock = &self.ca_bundle_lock,
+                    .bundle = &self.ca_bundle,
+                },
+            },
             .write_buffer = tls_write_buf,
             .read_buffer = tls_read_buf,
             .entropy = &entropy,
