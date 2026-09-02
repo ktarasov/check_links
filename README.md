@@ -31,10 +31,17 @@
 - Режим «только ошибки» — показывать лишь упавшие ссылки.
 - Индикатор прогресса выполнения проверки.
 - Интернационализация интерфейса: справка CLI, сообщения об ошибках и предупреждениях, заголовки таблицы и CSV, а также шаблон прогресс-бара собираются на русском или английском языке через build-опцию `-Dlocale` (по умолчанию `ru`).
+- Генерация скрипта автодополнения (автокомплита) командной строки через подкоманду `completion`. Поддерживаются оболочки `bash`, `zsh`, `fish` и `nushell`.
+- Явная обработка ошибок приложения в функции `main`: ошибки разбора аргументов, инициализации парсера, заголовков и генерации скрипта автодополнения выводятся локализованным сообщением в stderr, а процесс завершается с ненулевым кодом возврата.
 
 ## Требования
 
 - **Zig 0.16.0** или новее (см. `minimum_zig_version` в [`build.zig.zon`](build.zig.zon)).
+
+Внешние зависимости проекта:
+
+- [`args.zig`](https://github.com/ktarasov/args.zig) (0.0.9) — разбор аргументов командной строки; обеспечивает подкоманды и генерацию скриптов автодополнения.
+- `zigquery` (0.2.0) — HTML-парсер для извлечения `href`/`src`.
 
 ## Установка и сборка
 
@@ -94,11 +101,40 @@ check_links <URL> [опции]
 | `-H`, `--header <NAME: VALUE>` | Добавить HTTP-заголовок; опцию можно повторять. |
 | `-p`, `--parallels <количество>` | Количество параллельных запросов (по умолчанию 5; от 1 до 100). |
 
+### Подкоманда `completion`
+
+Генерирует скрипт автодополнения (автокомплита) для среды, в которой запущена утилита. Тип оболочки определяется автоматически по переменной окружения `$SHELL`. Поддерживаются `bash`, `zsh`, `fish` и `nushell`.
+
+```sh
+check_links completion
+```
+
+Скрипт выводится в стандартный поток вывода, поэтому его можно перенаправить в файл автозагрузки вашей оболочки:
+
+```sh
+# bash
+check_links completion > ~/.bash_completion
+
+# zsh
+check_links completion > ${fpath[1]}/_check_links
+
+# fish
+check_links completion > ~/.config/fish/completions/check_links.fish
+
+# nushell
+check_links completion > check_links-completions.nu
+```
+
+Если тип оболочки определить не удалось или при генерации произошла ошибка, утилита выводит сообщение об ошибке в stderr и завершается с ненулевым кодом возврата.
+
 ### Примеры
 
 ```sh
 # Проверить все ссылки на странице и вывести таблицу в терминал
 check_links https://example.com/
+
+# Сгенерировать скрипт автодополнения для текущей оболочки
+check_links completion
 
 # Показать только ошибочные ссылки
 check_links --fail https://example.com/
@@ -237,7 +273,7 @@ check_links --fail https://сайт-клиента.рф/
 
 | Модуль | Назначение |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | Точка входа CLI, разбор аргументов (включая таймаут и число параллельных запросов). |
+| [`src/main.zig`](src/main.zig) | Точка входа CLI: разбор аргументов (включая таймаут, число параллельных запросов и подкоманду `completion`), а также явная обработка ошибок с локализованными сообщениями и корректными кодами возврата. |
 | [`src/i18n.zig`](src/i18n.zig) | Типизированный каталог локализованных сообщений (`ru`/`en`) и выбор активной локали через `-Dlocale`. |
 | [`src/lang.zig`](src/lang.zig) | Перечисление поддерживаемых языков интерфейса (используется сборкой). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Оркестрация проверки ссылок на одной странице. |
@@ -320,10 +356,17 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - "Errors only" mode — shows only failed links.
 - Progress bar for the checking process.
 - UI localization: CLI help, error and warning messages, table and CSV headers, and the progress-bar template can be built in Russian or English via the `-Dlocale` build option (default `ru`).
+- Generates a shell autocompletion script via the `completion` subcommand. Supported shells are `bash`, `zsh`, `fish`, and `nushell`.
+- Explicit application error handling in `main`: errors from argument parsing, parser initialization, headers, and completion-script generation are printed as a localized message to stderr, and the process exits with a non-zero return code.
 
 ## Requirements
 
 - **Zig 0.16.0** or newer (see `minimum_zig_version` in [`build.zig.zon`](build.zig.zon)).
+
+External project dependencies:
+
+- [`args.zig`](https://github.com/ktarasov/args.zig) (0.0.9) — command-line argument parsing; provides subcommands and autocompletion script generation.
+- `zigquery` (0.2.0) — HTML parser for extracting `href`/`src`.
 
 ## Installation and Build
 
@@ -383,11 +426,40 @@ check_links <URL> [options]
 | `-H`, `--header <NAME: VALUE>` | Add an HTTP header; may be repeated. |
 | `-p`, `--parallels <count>` | Number of parallel requests (default 5; from 1 to 100). |
 
+### The `completion` Subcommand
+
+Generates an autocompletion script for the environment the utility is run in. The shell type is detected automatically from the `$SHELL` environment variable. Supported shells are `bash`, `zsh`, `fish`, and `nushell`.
+
+```sh
+check_links completion
+```
+
+The script is written to standard output, so you can redirect it to your shell's autoload file:
+
+```sh
+# bash
+check_links completion > ~/.bash_completion
+
+# zsh
+check_links completion > ${fpath[1]}/_check_links
+
+# fish
+check_links completion > ~/.config/fish/completions/check_links.fish
+
+# nushell
+check_links completion > check_links-completions.nu
+```
+
+If the shell type cannot be determined or generation fails, the utility prints an error to stderr and exits with a non-zero return code.
+
 ### Examples
 
 ```sh
 # Check all links on a page and print a table in the terminal
 check_links https://example.com/
+
+# Generate an autocompletion script for the current shell
+check_links completion
 
 # Show only failed links
 check_links --fail https://example.com/
@@ -526,7 +598,7 @@ check_links --fail https://client-site.example.com/
 
 | Module | Purpose |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | CLI entry point, argument parsing (including timeout and the number of parallel requests). |
+| [`src/main.zig`](src/main.zig) | CLI entry point: argument parsing (including timeout, the number of parallel requests, and the `completion` subcommand), plus explicit error handling with localized messages and correct return codes. |
 | [`src/i18n.zig`](src/i18n.zig) | Typed catalog of localized messages (`ru`/`en`) and active-locale selection via `-Dlocale`. |
 | [`src/lang.zig`](src/lang.zig) | Enum of supported UI languages (used by the build). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestrates link checking for a single page. |
