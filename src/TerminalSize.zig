@@ -14,19 +14,19 @@ pub fn default() TerminalSize {
 
 /// Получить ширину терминала. При неудаче — 80 (аналог `tput cols`).
 pub fn getTerminalWidth() usize {
-    const terminal_size = getTerminalSize() catch TerminalSize.default();
+    const terminal_size = getTerminalSize();
     return @as(usize, terminal_size.cols);
 }
 
 /// Попытка определить размер терминала с учётом платформы.
-pub fn getTerminalSize() !TerminalSize {
+pub fn getTerminalSize() TerminalSize {
     switch (builtin.os.tag) {
         .windows => return getWindowsTerminalSize(),
         else => return getPosixTerminalSize(),
     }
 }
 
-fn getPosixTerminalSize() !TerminalSize {
+fn getPosixTerminalSize() TerminalSize {
     var wsz: std.posix.winsize = std.mem.zeroes(std.posix.winsize);
 
     const result = std.posix.system.ioctl(std.posix.STDOUT_FILENO, std.posix.T.IOCGWINSZ, @intFromPtr(&wsz));
@@ -40,7 +40,7 @@ fn getPosixTerminalSize() !TerminalSize {
     };
 }
 
-fn getWindowsTerminalSize() !TerminalSize {
+fn getWindowsTerminalSize() TerminalSize {
     const CONSOLE_SCREEN_BUFFER_INFO = extern struct {
         dwSize: extern struct { X: i16, Y: i16 },
         dwCursorPosition: extern struct { X: i16, Y: i16 },
