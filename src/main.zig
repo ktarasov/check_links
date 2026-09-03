@@ -5,6 +5,7 @@ const check_links_by_page = @import("check_links_by_page.zig");
 const request_headers = @import("request_headers.zig");
 const i18n = @import("i18n.zig");
 const Io = std.Io;
+const TerminalSize = @import("TerminalSize.zig");
 
 extern "kernel32" fn SetConsoleOutputCP(wCodePageID: std.os.windows.UINT) callconv(.winapi) std.os.windows.BOOL;
 
@@ -18,6 +19,8 @@ pub fn main(init: std.process.Init) !u8 {
         _ = SetConsoleOutputCP(CP_UTF8);
     }
 
+    const terminal_width = TerminalSize.getTerminalWidth();
+
     var parser = args.ArgumentParser.init(arena, .{
         .name = "check_links",
         .version = "1.0.0",
@@ -30,7 +33,7 @@ pub fn main(init: std.process.Init) !u8 {
             // начинается в столбце help_indent (35), а обычные строки — ~38-40,
             // что ломает вертикальное выравнивание (особенно для длинных русских
             // строк). Большой лимит гарантирует единую вертикальную линию.
-            .help_line_width = 200,
+            .help_line_width = terminal_width,
             .custom_help_strings = .{
                 .usage_label = i18n.Current.usage,
                 .arguments_label = i18n.Current.arguments,
@@ -161,6 +164,7 @@ pub fn main(init: std.process.Init) !u8 {
             .headers = headers.items,
             .timeout = @abs(result.getInt("timeout") orelse 15),
             .parallels = @intCast(result.getInt("parallels") orelse 5),
+            .terminal_width = terminal_width,
         });
     } else {
         printError(io, i18n.Current.err_no_url);

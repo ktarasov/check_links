@@ -50,6 +50,7 @@ pub fn checkLinkList(
     url_list: []const []const u8,
     headers: []const std.http.Header,
     timeout: u64,
+    terminal_width: usize,
     writer: ?*std.Io.Writer,
 ) !CheckedList {
     var result = CheckedList.init(allocator);
@@ -60,6 +61,7 @@ pub fn checkLinkList(
         allocator,
         io,
         @floatFromInt(url_list.len),
+        terminal_width,
         i18n.Current.progress_template,
         writer,
     );

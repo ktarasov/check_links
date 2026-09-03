@@ -25,6 +25,8 @@ pub const Options = struct {
     headers: []const std.http.Header = &.{},
     /// Количество параллельных запросов.
     parallels: u8 = 5,
+    /// Ширина терминала в символах.
+    terminal_width: usize = 80,
 };
 
 /// Запускает процесс проверки ссылок на странице.
@@ -70,6 +72,7 @@ pub fn run(
         url_list.items,
         options.headers,
         options.timeout,
+        options.terminal_width,
         &stderr_writer.interface,
     ) catch {
         printError(io, i18n.Current.err_check_links, .{});

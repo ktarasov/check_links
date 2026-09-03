@@ -77,6 +77,7 @@ pub const Bar = struct {
         allocator: std.mem.Allocator,
         io: std.Io,
         total: f64,
+        width: usize,
         format: []const u8,
         writer: ?*Writer,
     ) !*Bar {
@@ -85,9 +86,6 @@ pub const Bar = struct {
 
         const fmt = try allocator.dupe(u8, format);
         errdefer allocator.free(fmt);
-
-        // Получаем ширину терминала; при неудаче — 80 колонок (аналог `tput cols`).
-        const width = getTerminalWidth();
 
         const now = nowSeconds(io);
 
@@ -300,72 +298,6 @@ fn nowSeconds(io: std.Io) f64 {
     const ts = std.Io.Timestamp.now(io, .awake);
     return @as(f64, @floatFromInt(ts.nanoseconds)) /
         @as(f64, @floatFromInt(std.time.ns_per_s));
-}
-
-/// Получить ширину терминала. При неудаче — 80 (аналог `tput cols`).
-fn getTerminalWidth() usize {
-    const terminal_size = getTerminalSize() catch TerminalSize.default();
-    return @as(usize, terminal_size.cols);
-}
-
-/// Размеры терминала.
-pub const TerminalSize = struct {
-    cols: u16,
-    rows: u16,
-
-    pub fn default() TerminalSize {
-        return .{ .cols = 80, .rows = 24 };
-    }
-};
-
-/// Попытка определить размер терминала с учётом платформы.
-pub fn getTerminalSize() !TerminalSize {
-    switch (builtin.os.tag) {
-        .windows => return getWindowsTerminalSize(),
-        else => return getPosixTerminalSize(),
-    }
-}
-
-fn getPosixTerminalSize() !TerminalSize {
-    var wsz: std.posix.winsize = std.mem.zeroes(std.posix.winsize);
-
-    const result = std.posix.system.ioctl(std.posix.STDOUT_FILENO, std.posix.T.IOCGWINSZ, @intFromPtr(&wsz));
-    if (result != 0) {
-        return TerminalSize.default();
-    }
-
-    return .{
-        .cols = wsz.col,
-        .rows = wsz.row,
-    };
-}
-
-fn getWindowsTerminalSize() !TerminalSize {
-    const CONSOLE_SCREEN_BUFFER_INFO = extern struct {
-        dwSize: extern struct { X: i16, Y: i16 },
-        dwCursorPosition: extern struct { X: i16, Y: i16 },
-        wAttributes: u16,
-        srWindow: extern struct { Left: i16, Top: i16, Right: i16, Bottom: i16 },
-        dwMaximumWindowSize: extern struct { X: i16, Y: i16 },
-    };
-
-    const kernel32 = struct {
-        extern "kernel32" fn GetConsoleScreenBufferInfo(
-            handle: std.os.windows.HANDLE,
-            info: *CONSOLE_SCREEN_BUFFER_INFO,
-        ) callconv(.winapi) std.os.windows.BOOL;
-    };
-
-    const handle = std.os.windows.peb().ProcessParameters.hStdOutput;
-
-    var info: CONSOLE_SCREEN_BUFFER_INFO = undefined;
-    if (kernel32.GetConsoleScreenBufferInfo(handle, &info) == .FALSE) {
-        return TerminalSize.default();
-    }
-
-    const w: u16 = @intCast(info.srWindow.Right - info.srWindow.Left + 1);
-    const h: u16 = @intCast(info.srWindow.Bottom - info.srWindow.Top + 1);
-    return .{ .cols = w, .rows = h };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
