@@ -32,8 +32,8 @@ pub fn build(b: *std.Build) void {
 
     const lang = @import("src/lang.zig");
 
-    // Локаль интерфейса: -Dlocale=ru|en (по умолчанию ru).
-    const locale_option = b.option(lang.Lang, "locale", "UI language (ru|en)") orelse .ru;
+    // Локаль интерфейса: -Dlocale=ru|en|es|fr (по умолчанию ru).
+    const locale_option = b.option(lang.Lang, "locale", "UI language (ru|en|es|fr)") orelse .ru;
 
     const build_options = b.addOptions();
     build_options.addOption(lang.Lang, "locale", locale_option);
@@ -100,7 +100,7 @@ pub fn build(b: *std.Build) void {
     { // zig build release
         const release_step = b.step("release", "Build release binaries");
         const install_dir: std.Build.InstallDir = .{ .custom = "compressed" };
-        const release_locales = [_]lang.Lang{ .ru, .en };
+        const release_locales = [_]lang.Lang{ .ru, .en, .es, .fr };
         for (release_locales) |locale| {
             for (release_targets) |release_target| {
                 const resolved_target = b.resolveTargetQuery(release_target);

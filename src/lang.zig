@@ -6,4 +6,6 @@
 pub const Lang = enum {
     ru,
     en,
+    es,
+    fr,
 };

@@ -169,6 +169,114 @@ pub const en: Messages = .{
     .default = "[default: ",
 };
 
+/// Испанская локаль.
+pub const es: Messages = .{
+    .desc =
+    \\CheckLinks
+    \\
+    \\Una utilidad CLI para comprobar los enlaces de una página web. Carga la
+    \\página HTML en la URL indicada, recopila todos los enlaces (<a href>) e
+    \\imágenes (<img src>), luego comprueba la disponibilidad de cada URL y
+    \\muestra el resultado en pantalla en forma de tabla o en un archivo CSV.
+    ,
+    .help_fail = "Mostrar solo los resultados con errores.",
+    .help_export = "Salida en formato CSV",
+    .help_timeout = "Tiempo de espera en segundos",
+    .help_parallels = "Número de solicitudes paralelas",
+    .help_header = "Establecer una cabecera HTTP (se puede repetir)",
+    .help_url = "La URL a comprobar.",
+    .err_out_of_memory = "memoria insuficiente",
+    .err_no_url = "no se proporcionó ninguna URL para comprobar",
+    .err_header_format = "la cabecera debe tener el formato NAME: VALUE",
+    .err_header_name = "nombre de cabecera no válido",
+    .err_header_value = "el valor de la cabecera contiene un salto de línea prohibido",
+    .err_header_managed = "Content-Length y Transfer-Encoding son establecidos por el cliente HTTP",
+    .err_header_other = "no se pudieron procesar las cabeceras HTTP",
+    .err_prefix = "Error:",
+    .warn_prefix = "Advertencia:",
+    .err_load_failed = "Error al cargar la página: {s}",
+    .err_invalid_url = "URL no válida: {s}",
+    .warn_no_urls = "No se encontraron URLs en la página {s}",
+    .err_check_links = "Error al comprobar los enlaces",
+    .err_export_csv = "Error al exportar a CSV: {s}",
+    .err_render_table = "Error al mostrar la tabla",
+    .msg_empty_list = "Se pasó una lista vacía de enlaces comprobados",
+    .col_num = " Nº ",
+    .col_page_url = "URL de la página",
+    .col_checked_url = "URL comprobada",
+    .col_http_code = "Código HTTP",
+    .csv_header = "Nº;URL de la página;URL comprobada;Código HTTP",
+    .progress_template = "Procesando: [:bar] - :current/:total - :percent% - Transcurrido::elapseds - Restante::etas - Velocidad::rate/s",
+    .completion = "Generar el script de autocompletado",
+    .err_no_shell = "Tipo de shell desconocido",
+    .err_generate_completion = "Error al generar el script de autocompletado",
+    .err_init_parser = "Error al inicializar el programa. Error: ",
+    .arguments = "ARGUMENTOS:",
+    .commands = "COMANDOS:",
+    .command_tag = " <COMANDO>",
+    .options = "OPCIONES:",
+    .options_tag = " [OPCIONES]",
+    .required = "[obligatorio]",
+    .help = "Mostrar esta ayuda",
+    .version = "Mostrar la versión",
+    .usage = "USO:",
+    .default = "[por defecto: ",
+};
+
+/// Французская локаль.
+pub const fr: Messages = .{
+    .desc =
+    \\CheckLinks
+    \\
+    \\Un utilitaire CLI pour vérifier les liens d'une page web. Il charge la page
+    \\HTML à l'URL indiquée, collecte tous les liens (<a href>) et les images
+    \\(<img src>), puis vérifie la disponibilité de chaque URL et affiche le
+    \\résultat à l'écran sous forme de tableau ou dans un fichier CSV.
+    ,
+    .help_fail = "Afficher uniquement les résultats avec des erreurs.",
+    .help_export = "Sortie au format CSV",
+    .help_timeout = "Délai d'attente en secondes",
+    .help_parallels = "Nombre de requêtes parallèles",
+    .help_header = "Définir un en-tête HTTP (peut être répété)",
+    .help_url = "L'URL à vérifier.",
+    .err_out_of_memory = "mémoire insuffisante",
+    .err_no_url = "aucune URL à vérifier n'a été fournie",
+    .err_header_format = "l'en-tête doit avoir le format NAME: VALUE",
+    .err_header_name = "nom d'en-tête invalide",
+    .err_header_value = "la valeur de l'en-tête contient un saut de ligne interdit",
+    .err_header_managed = "Content-Length et Transfer-Encoding sont définis par le client HTTP",
+    .err_header_other = "échec du traitement des en-têtes HTTP",
+    .err_prefix = "Erreur :",
+    .warn_prefix = "Avertissement :",
+    .err_load_failed = "Erreur lors du chargement de la page : {s}",
+    .err_invalid_url = "URL invalide : {s}",
+    .warn_no_urls = "Aucune URL trouvée sur la page {s}",
+    .err_check_links = "Erreur lors de la vérification des liens",
+    .err_export_csv = "Erreur lors de l'exportation en CSV : {s}",
+    .err_render_table = "Erreur lors de l'affichage du tableau",
+    .msg_empty_list = "Une liste vide de liens vérifiés a été passée",
+    .col_num = " N° ",
+    .col_page_url = "URL de la page",
+    .col_checked_url = "URL vérifiée",
+    .col_http_code = "Code HTTP",
+    .csv_header = "N°;URL de la page;URL vérifiée;Code HTTP",
+    .progress_template = "Traitement : [:bar] - :current/:total - :percent% - Écoulé::elapseds - Restant::etas - Vitesse::rate/s",
+    .completion = "Générer le script de complétion",
+    .err_no_shell = "Type de shell inconnu",
+    .err_generate_completion = "Erreur lors de la génération du script de complétion",
+    .err_init_parser = "Erreur lors de l'initialisation du programme. Erreur : ",
+    .arguments = "ARGUMENTS :",
+    .commands = "COMMANDES :",
+    .command_tag = " <COMMANDE>",
+    .options = "OPTIONS :",
+    .options_tag = " [OPTIONS]",
+    .required = "[obligatoire]",
+    .help = "Afficher cette aide",
+    .version = "Afficher la version",
+    .usage = "UTILISATION :",
+    .default = "[par défaut : ",
+};
+
 /// Активная локаль, выбранная build-опцией `-Dlocale` (по умолчанию `ru`).
 ///
 /// `build_options.locale` — константа, известная на этапе компиляции, поэтому
@@ -176,4 +284,6 @@ pub const en: Messages = .{
 pub const Current: Messages = switch (build_options.locale) {
     .ru => ru,
     .en => en,
+    .es => es,
+    .fr => fr,
 };
