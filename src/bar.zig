@@ -320,7 +320,7 @@ test "init создаёт бар и скрывает курсор в поток�
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     const written = w.buffered();
@@ -330,7 +330,7 @@ test "init создаёт бар и скрывает курсор в поток�
 
 test "init с нулевым writer не падает" {
     const io = testIo();
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", null);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", null);
     defer bar.deinit();
 
     try testing.expectEqual(@as(f64, 10), bar.total);
@@ -341,7 +341,7 @@ test "tick увеличивает current" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar] - :current/:total", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar] - :current/:total", &w);
     defer bar.deinit();
 
     bar.throttle = 0; // принудительно отрисовываем всегда
@@ -356,7 +356,7 @@ test "update устанавливает current и пересчитывает п
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 100, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 100, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.throttle = 0;
@@ -375,7 +375,7 @@ test "update при current=0 не вычисляет eta" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.throttle = 0;
@@ -389,7 +389,7 @@ test "eta вычисляется корректно" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 100, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 100, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.throttle = 0;
@@ -407,7 +407,7 @@ test "rate вычисляется корректно" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 100, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 100, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.throttle = 0;
@@ -422,7 +422,7 @@ test "interrupt выводит сообщение и рисует бар" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     const before_len = w.buffered().len;
@@ -440,7 +440,7 @@ test "end выводит новую строку и показывает кур�
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     const before_len = w.buffered().len;
@@ -457,7 +457,7 @@ test "roundAndPad дополняет число пробелами до 6 сим
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     const s = bar.roundAndPad(3.14, 1);
@@ -471,7 +471,7 @@ test "замена токенов в drawBar" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: :current/:total - :percent% - :elapsed - :eta - :rate/s", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: :current/:total - :percent% - :elapsed - :eta - :rate/s", &w);
     defer bar.deinit();
 
     bar.throttle = 0;
@@ -491,7 +491,7 @@ test "buildBarString создаёт полосу с правильными си�
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.percent = 50;
@@ -508,7 +508,7 @@ test "deinit вызывает end (показывает курсор)" {
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     const written_before = w.buffered().len;
 
     // deinit должен вывести "\n" и показать курсор.
@@ -524,7 +524,7 @@ test "buildBarString при 0% создаёт только неполные си
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.percent = 0;
@@ -542,7 +542,7 @@ test "buildBarString при 100% создаёт только полные сим
     var w = Writer.fixed(&buf);
     const io = testIo();
 
-    var bar = try Bar.init(testing.allocator, io, 10, "Progress: [:bar]", &w);
+    var bar = try Bar.init(testing.allocator, io, 10, 80, "Progress: [:bar]", &w);
     defer bar.deinit();
 
     bar.percent = 100;

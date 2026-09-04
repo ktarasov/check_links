@@ -124,6 +124,7 @@ test "checkLinkList: пустой список возвращает пустой
         &.{},
         &.{},
         15,
+        80,
         null,
     );
     defer result.deinit();
