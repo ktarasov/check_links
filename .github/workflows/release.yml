@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install 7zip
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Run tests
+        run: zig build test
+
+      - name: Build release artifacts
+        run: zig build release
+
+      - name: Check and read release notes
+        id: notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          NOTES_FILE="RELEASE_NOTES_${TAG}.md"
+
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "::error::Файл $NOTES_FILE не найден. Создайте его перед публикацией тега $TAG."
+            exit 1
+          fi
+
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<EOF"
+            cat "$NOTES_FILE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create and publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: zig-out/compressed/*
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+          title: CheckLinks ${{ github.ref_name }}
