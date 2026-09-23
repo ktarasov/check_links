@@ -64,16 +64,16 @@ jobs:
           # Извлекаем бинарники из Linux-архивов и собираем пакеты
           for archive in zig-out/compressed/*linux*.tar.gz; do
             # Извлекаем имя локали из имени архива
-            # Пример: check_links_ru_v1.0.0_x86_64-linux.tar.gz -> ru
+            # Пример: check_links-x86_64-linux-en.tar.gz -> en
             BASENAME=$(basename "$archive")
-            LOCALE=$(echo "$BASENAME" | grep -oP '_(ru|en|es|fr)_' | tr -d '_')
+            LOCALE=$(echo "$BASENAME" | grep -oP '(ru|en|es|fr).tar.gz' | tr -d '.tar.gz')
 
             # Временная директория для распаковки
             TMPDIR=$(mktemp -d)
             tar -xzf "$archive" -C "$TMPDIR"
 
             # Находим бинарник
-            BIN=$(find "$TMPDIR" -type f -name "check_links" | head -1)
+            BIN=$(find "$TMPDIR" -type f -name "check-links" | head -1)
 
             if [ -z "$BIN" ]; then
               echo "::error::Бинарник не найден в архиве $archive"
@@ -90,7 +90,7 @@ jobs:
               --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
               --url "https://github.com/ktarasov/check_links" \
               --license MIT \
-              "${BIN}=/usr/bin/check_links"
+              "${BIN}=/usr/bin/check-links"
 
             # Создаём .rpm
             fpm \
@@ -102,7 +102,7 @@ jobs:
               --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
               --url "https://github.com/ktarasov/check_links" \
               --license MIT \
-              "${BIN}=/usr/bin/check_links"
+              "${BIN}=/usr/bin/check-links"
 
             rm -rf "$TMPDIR"
           done
@@ -119,6 +119,6 @@ jobs:
             packages/*.rpm
           body: ${{ steps.notes.outputs.body }}
           generate_release_notes: false
-          draft: false
+          draft: true
           prerelease: false
           title: CheckLinks ${{ github.ref_name }}
