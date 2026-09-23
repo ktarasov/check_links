@@ -59,6 +59,7 @@ pub const Messages = struct {
     help: []const u8,
     version: []const u8,
     default: []const u8,
+    err_unknown: []const u8,
 };
 
 /// Русская локаль (по умолчанию).
@@ -113,6 +114,7 @@ pub const ru: Messages = .{
     .version = "Вывести версию",
     .usage = "ИСПОЛЬЗОВАНИЕ:",
     .default = "[по умолчанию: ",
+    .err_unknown = "Неизвестная ошибка при выполнении программы.",
 };
 
 /// Английская локаль.
@@ -167,6 +169,7 @@ pub const en: Messages = .{
     .version = "Show version",
     .usage = "USAGE:",
     .default = "[default: ",
+    .err_unknown = "Unknown error while executing the program.",
 };
 
 /// Испанская локаль.
@@ -221,6 +224,7 @@ pub const es: Messages = .{
     .version = "Mostrar la versión",
     .usage = "USO:",
     .default = "[por defecto: ",
+    .err_unknown = "Erro de tipo desconocido al ejecutar el programa.",
 };
 
 /// Французская локаль.
@@ -275,6 +279,7 @@ pub const fr: Messages = .{
     .version = "Afficher la version",
     .usage = "UTILISATION :",
     .default = "[par défaut : ",
+    .err_unknown = "Erreur inconnue lors de l'exécution du programme.",
 };
 
 /// Активная локаль, выбранная build-опцией `-Dlocale` (по умолчанию `ru`).
