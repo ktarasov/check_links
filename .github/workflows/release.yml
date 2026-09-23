@@ -23,6 +23,11 @@ jobs:
         with:
           version: 0.16.0
 
+      - name: Install fpm
+        run: |
+          sudo apt-get install -y ruby ruby-dev
+          sudo gem install fpm
+
       - name: Run tests
         run: zig build test
 
@@ -47,10 +52,71 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Build .deb and .rpm packages
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Убираем ведущую 'v' для номера версии в пакетах
+          PKG_VERSION="${VERSION#v}"
+
+          # Директория для готовых пакетов
+          mkdir -p packages
+
+          # Извлекаем бинарники из Linux-архивов и собираем пакеты
+          for archive in zig-out/compressed/*linux*.tar.gz; do
+            # Извлекаем имя локали из имени архива
+            # Пример: check_links_ru_v1.0.0_x86_64-linux.tar.gz -> ru
+            BASENAME=$(basename "$archive")
+            LOCALE=$(echo "$BASENAME" | grep -oP '_(ru|en|es|fr)_' | tr -d '_')
+
+            # Временная директория для распаковки
+            TMPDIR=$(mktemp -d)
+            tar -xzf "$archive" -C "$TMPDIR"
+
+            # Находим бинарник
+            BIN=$(find "$TMPDIR" -type f -name "check_links" | head -1)
+
+            if [ -z "$BIN" ]; then
+              echo "::error::Бинарник не найден в архиве $archive"
+              exit 1
+            fi
+
+            # Создаём .deb
+            fpm \
+              -s dir \
+              -t deb \
+              -n "check_links_${LOCALE}" \
+              -v "$PKG_VERSION" \
+              -a x86_64 \
+              --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
+              --url "https://github.com/ktarasov/check_links" \
+              --license MIT \
+              "${BIN}=/usr/bin/check_links"
+
+            # Создаём .rpm
+            fpm \
+              -s dir \
+              -t rpm \
+              -n "check_links_${LOCALE}" \
+              -v "$PKG_VERSION" \
+              -a x86_64 \
+              --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
+              --url "https://github.com/ktarasov/check_links" \
+              --license MIT \
+              "${BIN}=/usr/bin/check_links"
+
+            rm -rf "$TMPDIR"
+          done
+
+          # Перемещаем все пакеты в одну директорию
+          mv *.deb *.rpm packages/ 2>/dev/null || true
+
       - name: Create and publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: zig-out/compressed/*
+          files: |
+            zig-out/compressed/*
+            packages/*.deb
+            packages/*.rpm
           body: ${{ steps.notes.outputs.body }}
           generate_release_notes: false
           draft: false
