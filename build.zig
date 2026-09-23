@@ -31,12 +31,14 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const lang = @import("src/lang.zig");
+    const pkg = @import("build.zig.zon");
 
     // Локаль интерфейса: -Dlocale=ru|en|es|fr (по умолчанию ru).
     const locale_option = b.option(lang.Lang, "locale", "UI language (ru|en|es|fr)") orelse .ru;
 
     const build_options = b.addOptions();
     build_options.addOption(lang.Lang, "locale", locale_option);
+    build_options.addOption([]const u8, "version", pkg.version);
 
     // 1. Add args.zig as a dependency
     const args_dep = b.dependency("args", .{
@@ -50,7 +52,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "check_links",
+        .name = "check-links",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -105,7 +107,7 @@ pub fn build(b: *std.Build) void {
             for (release_targets) |release_target| {
                 const resolved_target = b.resolveTargetQuery(release_target);
                 const exe_release = b.addExecutable(.{
-                    .name = "check_links",
+                    .name = "check-links",
                     .root_module = b.createModule(.{
                         .root_source_file = b.path("src/main.zig"),
                         .target = resolved_target,
@@ -119,6 +121,7 @@ pub fn build(b: *std.Build) void {
 
                 const build_release_options = b.addOptions();
                 build_release_options.addOption(lang.Lang, "locale", locale);
+                build_release_options.addOption([]const u8, "version", pkg.version);
                 exe_release.root_module.addOptions("build_options", build_release_options);
 
                 const is_windows = release_target.os_tag == .windows;
@@ -129,7 +132,7 @@ pub fn build(b: *std.Build) void {
                 var file_path: std.Build.LazyPath = undefined;
                 for (extensions) |extension| {
                     // archive file name
-                    const file_name = b.fmt("check_links-{t}-{t}-{t}.{t}", .{
+                    const file_name = b.fmt("check-links-{t}-{t}-{t}.{t}", .{
                         resolved_target.result.cpu.arch,
                         resolved_target.result.os.tag,
                         locale,

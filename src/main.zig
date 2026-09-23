@@ -6,10 +6,11 @@ const request_headers = @import("request_headers.zig");
 const i18n = @import("i18n.zig");
 const Io = std.Io;
 const TerminalSize = @import("TerminalSize.zig");
+const build_options = @import("build_options");
 
 extern "kernel32" fn SetConsoleOutputCP(wCodePageID: std.os.windows.UINT) callconv(.winapi) std.os.windows.BOOL;
 
-pub fn main(init: std.process.Init) !u8 {
+pub fn main(init: std.process.Init) u8 {
     const arena: std.mem.Allocator = init.arena.allocator();
     const io = init.io;
 
@@ -23,7 +24,7 @@ pub fn main(init: std.process.Init) !u8 {
 
     var parser = args.ArgumentParser.init(arena, .{
         .name = "check_links",
-        .version = "1.1.0",
+        .version = build_options.version,
         .description = i18n.Current.desc,
         .config = .{
             .allow_negated_flags = false,
@@ -119,7 +120,7 @@ pub fn main(init: std.process.Init) !u8 {
     var result = parser.parseProcess(init) catch |err| {
         const message = switch (err) {
             error.OutOfMemory => i18n.Current.err_out_of_memory,
-            else => return err,
+            else => i18n.Current.err_unknown,
         };
         printError(io, message);
         return 1;
