@@ -23,7 +23,7 @@ pub fn main(init: std.process.Init) u8 {
     const terminal_width = TerminalSize.getTerminalWidth();
 
     var parser = args.ArgumentParser.init(arena, .{
-        .name = "check_links",
+        .name = "check-links",
         .version = build_options.version,
         .description = i18n.Current.desc,
         .config = .{
