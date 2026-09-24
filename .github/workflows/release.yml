@@ -6,6 +6,11 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# Исключаем параллельные/двойные релизы для одного и того же ref
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -15,18 +20,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install 7zip
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+      # Релиз должен запускаться только по тегу v*: github.ref_name обязан
+      # быть корректным номером версии (имя файла RELEASE_NOTES, версия пакетов).
+      - name: Validate tag ref
+        if: github.ref_type != 'tag' || !startsWith(github.ref_name, 'v')
+        run: |
+          echo "::error::Релиз запускается только по тегу вида v* (текущий ref: ${{ github.ref_name }}, тип: ${{ github.ref_type }}). При ручном запуске выберите тег в качестве ref."
+          exit 1
+
+      - name: Install build & packaging dependencies
+        run: |
+          sudo apt-get update
+          # p7zip-full — 7z нужен для сборки Windows-архивов (.zip), см. build.zig
+          # rpm — предоставляет rpmbuild, необходимый fpm для сборки .rpm
+          # fakeroot — требуется fpm для сборки .deb
+          sudo apt-get install -y p7zip-full ruby ruby-dev rpm fakeroot
+          sudo gem install fpm --no-document
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.16.0
-
-      - name: Install fpm
-        run: |
-          sudo apt-get install -y ruby ruby-dev
-          sudo gem install fpm
 
       - name: Build release artifacts
         run: zig build release
@@ -43,10 +57,13 @@ jobs:
           fi
 
           echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+          # Уникальный разделитель: тело заметок не сломается,
+          # даже если в файле встретится строка "EOF".
+          DELIM="GH_RELEASE_NOTES_$(date +%s%N)"
           {
-            echo "body<<EOF"
+            echo "body<<$DELIM"
             cat "$NOTES_FILE"
-            echo "EOF"
+            echo "$DELIM"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build .deb and .rpm packages
@@ -55,15 +72,37 @@ jobs:
           # Убираем ведущую 'v' для номера версии в пакетах
           PKG_VERSION="${VERSION#v}"
 
+          # Предупреждение при расхождении версии тега и версии из build.zig.zon
+          ZON_VERSION=$(grep -oP '\.version = "\K[^"]+' build.zig.zon | head -1 || true)
+          if [ -n "$ZON_VERSION" ] && [ "$ZON_VERSION" != "$PKG_VERSION" ]; then
+            echo "::warning::Версия в build.zig.zon ($ZON_VERSION) не совпадает с тегом ($PKG_VERSION)"
+          fi
+
           # Директория для готовых пакетов
           mkdir -p packages
 
-          # Извлекаем бинарники из Linux-архивов и собираем пакеты
-          for archive in zig-out/compressed/*linux*.tar.gz; do
-            # Извлекаем имя локали из имени архива
-            # Пример: check_links-x86_64-linux-en.tar.gz -> en
+          # nullglob: не подставлять литерал, если архивов нет
+          shopt -s nullglob
+          ARCHIVES=(zig-out/compressed/*linux*.tar.gz)
+          if [ ${#ARCHIVES[@]} -eq 0 ]; then
+            echo "::error::Не найдено ни одного Linux-архива в zig-out/compressed/"
+            exit 1
+          fi
+
+          for archive in "${ARCHIVES[@]}"; do
+            # Извлекаем локаль из имени архива без grep -P
+            # Пример: check-links-x86_64-linux-en.tar.gz -> en
             BASENAME=$(basename "$archive")
-            LOCALE=$(echo "$BASENAME" | grep -oP '(ru|en|es|fr).tar.gz' | tr -d '.tar.gz')
+            LOCALE="${BASENAME##*-}"
+            LOCALE="${LOCALE%.tar.gz}"
+
+            case "$LOCALE" in
+              ru|en|es|fr) ;;
+              *)
+                echo "::error::Нераспознанная локаль '$LOCALE' в $archive"
+                exit 1
+                ;;
+            esac
 
             # Временная директория для распаковки
             TMPDIR=$(mktemp -d)
@@ -74,38 +113,28 @@ jobs:
 
             if [ -z "$BIN" ]; then
               echo "::error::Бинарник не найден в архиве $archive"
+              rm -rf "$TMPDIR"
               exit 1
             fi
 
-            # Создаём .deb
-            fpm \
-              -s dir \
-              -t deb \
-              -n "check_links_${LOCALE}" \
-              -v "$PKG_VERSION" \
-              -a x86_64 \
-              --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
-              --url "https://github.com/ktarasov/check_links" \
-              --license MIT \
-              "${BIN}=/usr/bin/check-links"
-
-            # Создаём .rpm
-            fpm \
-              -s dir \
-              -t rpm \
-              -n "check_links_${LOCALE}" \
-              -v "$PKG_VERSION" \
-              -a x86_64 \
-              --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
-              --url "https://github.com/ktarasov/check_links" \
-              --license MIT \
-              "${BIN}=/usr/bin/check-links"
+            # Создаём .deb и .rpm. Архитектура x86_64 (только такие Linux-таргеты),
+            # fpm сам сопоставит её с amd64 для deb. -p packages/ кладёт пакеты сразу в нужную папку.
+            for pkg_type in deb rpm; do
+              fpm \
+                -s dir \
+                -t "$pkg_type" \
+                -n "check_links_${LOCALE}" \
+                -v "$PKG_VERSION" \
+                -a x86_64 \
+                -p packages/ \
+                --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
+                --url "https://github.com/ktarasov/check_links" \
+                --license MIT \
+                "${BIN}=/usr/bin/check-links"
+            done
 
             rm -rf "$TMPDIR"
           done
-
-          # Перемещаем все пакеты в одну директорию
-          mv *.deb *.rpm packages/ 2>/dev/null || true
 
       - name: Create and publish GitHub Release
         uses: softprops/action-gh-release@v2
