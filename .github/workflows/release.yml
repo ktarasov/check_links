@@ -143,4 +143,7 @@ jobs:
           generate_release_notes: false
           draft: true
           prerelease: false
-          title: CheckLinks ${{ github.ref_name }}
+          # Заголовок релиза передаётся во входе name (входа title у
+          # softprops/action-gh-release нет — неизвестные входы игнорируются,
+          # и заголовок падал бы в дефолтный = имя тега).
+          name: CheckLinks ${{ github.ref_name }}
