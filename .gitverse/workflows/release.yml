@@ -1,0 +1,205 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Исключаем параллельные/двойные релизы для одного и того же ref
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Релиз должен запускаться только по тегу v*: github.ref_name обязан
+      # быть корректным номером версии (имя файла RELEASE_NOTES, версия пакетов).
+      - name: Validate tag ref
+        if: github.ref_type != 'tag' || !startsWith(github.ref_name, 'v')
+        run: |
+          echo "::error::Релиз запускается только по тегу вида v* (текущий ref: ${{ github.ref_name }}, тип: ${{ github.ref_type }}). При ручном запуске выберите тег в качестве ref."
+          exit 1
+
+      - name: Install build & packaging dependencies
+        run: |
+          sudo apt-get update
+          # p7zip-full — 7z нужен для сборки Windows-архивов (.zip), см. build.zig
+          # rpm — предоставляет rpmbuild, необходимый fpm для сборки .rpm
+          # fakeroot — требуется fpm для сборки .deb
+          sudo apt-get install -y p7zip-full ruby ruby-dev rpm fakeroot
+          sudo gem install fpm --no-document
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Build release artifacts
+        run: zig build release
+
+      - name: Check and expose release notes
+        id: notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          NOTES_FILE="RELEASE_NOTES_${TAG}.md"
+
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "::error::Файл $NOTES_FILE не найден. Создайте его перед публикацией тега $TAG."
+            exit 1
+          fi
+
+          # Тело релиза НЕ копируем через GITHUB_OUTPUT: heredoc ломается, если
+          # файл не заканчивается переводом строки, содержит CRLF или
+          # escape-последовательности (runner их обрабатывает). softprops/
+          # action-gh-release принимает body_path — передаём путь к файлу.
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Build .deb and .rpm packages
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Убираем ведущую 'v' для номера версии в пакетах
+          PKG_VERSION="${VERSION#v}"
+
+          # Предупреждение при расхождении версии тега и версии из build.zig.zon
+          ZON_VERSION=$(grep -oP '\.version = "\K[^"]+' build.zig.zon | head -1 || true)
+          if [ -n "$ZON_VERSION" ] && [ "$ZON_VERSION" != "$PKG_VERSION" ]; then
+            echo "::warning::Версия в build.zig.zon ($ZON_VERSION) не совпадает с тегом ($PKG_VERSION)"
+          fi
+
+          # Директория для готовых пакетов
+          mkdir -p packages
+
+          # nullglob: не подставлять литерал, если архивов нет
+          shopt -s nullglob
+          ARCHIVES=(zig-out/compressed/*linux*.tar.gz)
+          if [ ${#ARCHIVES[@]} -eq 0 ]; then
+            echo "::error::Не найдено ни одного Linux-архива в zig-out/compressed/"
+            exit 1
+          fi
+
+          for archive in "${ARCHIVES[@]}"; do
+            # Извлекаем локаль из имени архива без grep -P
+            # Пример: check-links-x86_64-linux-en.tar.gz -> en
+            BASENAME=$(basename "$archive")
+            LOCALE="${BASENAME##*-}"
+            LOCALE="${LOCALE%.tar.gz}"
+
+            case "$LOCALE" in
+              ru|en|es|fr) ;;
+              *)
+                echo "::error::Нераспознанная локаль '$LOCALE' в $archive"
+                exit 1
+                ;;
+            esac
+
+            # Временная директория для распаковки
+            TMPDIR=$(mktemp -d)
+            tar -xzf "$archive" -C "$TMPDIR"
+
+            # Находим бинарник
+            BIN=$(find "$TMPDIR" -type f -name "check-links" | head -1)
+
+            if [ -z "$BIN" ]; then
+              echo "::error::Бинарник не найден в архиве $archive"
+              rm -rf "$TMPDIR"
+              exit 1
+            fi
+
+            # Создаём .deb и .rpm. Архитектура x86_64 (только такие Linux-таргеты),
+            # fpm сам сопоставит её с amd64 для deb. -p packages/ кладёт пакеты сразу в нужную папку.
+            for pkg_type in deb rpm; do
+              fpm \
+                -s dir \
+                -t "$pkg_type" \
+                -n "check_links_${LOCALE}" \
+                -v "$PKG_VERSION" \
+                -a x86_64 \
+                -p packages/ \
+                --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
+                --url "https://github.com/ktarasov/check_links" \
+                --license MIT \
+                "${BIN}=/usr/bin/check-links"
+            done
+
+            rm -rf "$TMPDIR"
+          done
+
+      - name: Create and publish GitVerse Release
+        # softprops/action-gh-release на GitVerse не работает: он обращается к
+        # GitHub REST API (api.github.com) с GITHUB_TOKEN, которого на GitVerse
+        # нет. GitVerse использует свой Public API (https://api.gitverse.ru) и
+        # Bearer-токен. Требуется секрет CLZ_API_KEY: создайте API-ключ в
+        # https://gitverse.ru/settings/tokens (права: Репозитории -> Запись) и
+        # добавьте его в Secrets репозитория.
+        env:
+          CLZ_API_KEY: ${{ secrets.CLZ_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$CLZ_API_KEY" ]; then
+            echo "::error::Секрет CLZ_API_KEY не задан. Создайте API-ключ в https://gitverse.ru/settings/tokens (права: Репозитории → Запись) и добавьте его в Secrets репозитория."
+            exit 1
+          fi
+
+          API="https://api.gitverse.ru"
+          REPO="${{ github.repository }}"
+          TAG="${{ github.ref_name }}"
+          NOTES_FILE="${{ steps.notes.outputs.notes_file }}"
+          TITLE="CheckLinks ${TAG}"
+          ACCEPT="Accept: application/vnd.gitverse.object+json;version=1"
+          AUTH="Authorization: Bearer ${CLZ_API_KEY}"
+
+          # Тело релиза сериализуем в JSON через python3: это безопаснее, чем
+          # вставлять содержимое файла напрямую (экранирование, CRLF, кавычки).
+          python3 - "$TAG" "$TITLE" "$NOTES_FILE" > /tmp/release_body.json <<'PY'
+          import json, sys
+          tag, title, notes = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(notes, encoding='utf-8') as f:
+              body = f.read()
+          print(json.dumps({
+              "tag_name": tag,
+              "name": title,
+              "body": body,
+              "draft": True,
+              "prerelease": False,
+          }))
+          PY
+
+          # Создаём релиз как черновик (публикация — вручную, как и на GitHub).
+          echo "Создание релиза ${TAG} в репозитории ${REPO}..."
+          RESP=$(curl -sS -f \
+            -X POST "${API}/repos/${REPO}/releases" \
+            -H "$ACCEPT" \
+            -H "$AUTH" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/release_body.json)
+          RELEASE_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$RESP")
+          echo "Релиз создан: id=${RELEASE_ID}"
+
+          # Загружаем ассеты (архивы + .deb + .rpm).
+          shopt -s nullglob
+          ASSETS=(zig-out/compressed/* packages/*.deb packages/*.rpm)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "::error::Нет файлов для загрузки в релиз."
+            exit 1
+          fi
+          for f in "${ASSETS[@]}"; do
+            NAME=$(basename "$f")
+            echo "Загрузка ассета: ${NAME}"
+            curl -sS -f \
+              -X POST "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets?name=${NAME}" \
+              -H "$ACCEPT" \
+              -H "$AUTH" \
+              -H "Content-Type: multipart/form-data" \
+              -F "attachment=@${f}" > /dev/null
+          done
+
+          echo "Готово: черновик релиза ${TAG} создан с ${#ASSETS[@]} ассетами (draft=true)."
