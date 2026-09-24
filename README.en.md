@@ -18,8 +18,7 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Extracts URLs from the `href` attribute of `<a>` tags and the `src` attribute of `<img>` tags.
 - Normalizes relative links into absolute ones based on the base domain (including protocol-relative `//` links).
 - Removes duplicate URLs.
-- Concurrently checks the availability of each URL using the `HEAD` method (one thread per URL).
-- Checks URLs concurrently in batches of a configurable size: the number of parallel requests is set via `--parallels` (default 5), concurrently within a batch and sequentially between batches.
+- Concurrently checks URLs with the `HEAD` method in batches of a configurable size: the number of parallel requests is set via `--parallels` (default 5; one thread per URL within a batch, sequentially between batches).
 - Custom HTTP HEAD client with TLS support and a request timeout (15 seconds by default, configurable via `--timeout`).
 - Repeatable custom HTTP headers for authenticated pages and same-origin links.
 - Groups results by HTTP response code.
@@ -30,9 +29,10 @@ The utility loads the HTML page at the given URL, collects all links (`<a href>`
 - Exports results to a CSV file (delimiter `;`).
 - "Errors only" mode — shows only failed links.
 - Progress bar for the checking process.
+- Automatic terminal width detection (POSIX `ioctl` / Windows API) for adaptive table, help, and progress-bar output.
 - UI localization: CLI help, error and warning messages, table and CSV headers, and the progress-bar template can be built in Russian, English, Spanish, or French via the `-Dlocale` build option (default `ru`).
 - Generates a shell autocompletion script via the `completion` subcommand. Supported shells are `bash`, `zsh`, `fish`, and `nushell`.
-- Explicit application error handling in `main`: errors from argument parsing, parser initialization, headers, and completion-script generation are printed as a localized message to stderr, and the process exits with a non-zero return code.
+- Explicit application error handling in `main`: errors from argument parsing (including unknown ones — a localized message is printed instead of a technical stack trace), parser initialization, headers, and completion-script generation are printed as a localized message to stderr, and the process exits with a non-zero return code.
 
 ## Requirements
 
@@ -51,13 +51,13 @@ Clone the repository and build the project:
 zig build
 ```
 
-The binary will be placed in `zig-out/bin/`.
+The binary will be placed in `zig-out/bin/` under the name `check-links`.
 
 ### Build Commands
 
 | Command | Description |
 | --- | --- |
-| `zig build` | Builds the executable (`check_links`). |
+| `zig build` | Builds the executable (`check-links`). |
 | `zig build run -- <arguments>` | Builds and runs the utility. |
 | `zig build test` | Runs all tests. |
 | `zig build release` | Builds release binaries (compressed archives) for multiple platforms. |
@@ -75,6 +75,20 @@ The binary will be placed in `zig-out/bin/`.
 - `x86_64-macos`
 - `aarch64-macos`
 
+Archive names: `check-links-<arch>-<os>-<locale>.tar.gz` (Linux/macOS) and `check-links-<arch>-<os>-<locale>.zip` (Windows).
+
+For Linux, `.deb` and `.rpm` installation packages are also built (one per locale); the binary is installed to `/usr/bin/check-links`.
+
+### Automated Release Publishing (GitHub Actions)
+
+The project uses GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)): on tags matching `v*` or manually (`workflow_dispatch`), the workflow:
+
+1. runs the tests (`zig build test`);
+2. builds the release archives (`zig build release`);
+3. verifies that the `RELEASE_NOTES_<tag>.md` file exists — the publish stops with an error if it is missing;
+4. builds `.deb` and `.rpm` packages for all four locales;
+5. publishes a draft GitHub Release with the archives, packages, and release notes text.
+
 ### Localization
 
 The utility UI (CLI help, error and warning messages, table and CSV headers, progress-bar template) can be built in Russian, English, Spanish, or French. The language is selected at build time via the `-Dlocale` build option (default — Russian):
@@ -91,7 +105,7 @@ Localized strings live in the typed catalog [`src/i18n.zig`](src/i18n.zig); key 
 ## Usage
 
 ```sh
-check_links <URL> [options]
+check-links <URL> [options]
 ```
 
 ### Arguments
@@ -110,23 +124,23 @@ check_links <URL> [options]
 Generates an autocompletion script for the environment the utility is run in. The shell type is detected automatically from the `$SHELL` environment variable. Supported shells are `bash`, `zsh`, `fish`, and `nushell`.
 
 ```sh
-check_links completion
+check-links completion
 ```
 
 The script is written to standard output, so you can redirect it to your shell's autoload file:
 
 ```sh
 # bash
-check_links completion > ~/.bash_completion
+check-links completion > ~/.bash_completion
 
 # zsh
-check_links completion > ${fpath[1]}/_check_links
+check-links completion > ${fpath[1]}/_check-links
 
 # fish
-check_links completion > ~/.config/fish/completions/check_links.fish
+check-links completion > ~/.config/fish/completions/check-links.fish
 
 # nushell
-check_links completion > check_links-completions.nu
+check-links completion > check-links-completions.nu
 ```
 
 If the shell type cannot be determined or generation fails, the utility prints an error to stderr and exits with a non-zero return code.
@@ -135,28 +149,28 @@ If the shell type cannot be determined or generation fails, the utility prints a
 
 ```sh
 # Check all links on a page and print a table in the terminal
-check_links https://example.com/
+check-links https://example.com/
 
 # Generate an autocompletion script for the current shell
-check_links completion
+check-links completion
 
 # Show only failed links
-check_links --fail https://example.com/
+check-links --fail https://example.com/
 
 # Increase the request timeout to 60 seconds
-check_links --timeout 60 https://example.com/
+check-links --timeout 60 https://example.com/
 
 # Increase the number of parallel requests (e.g., to 20)
-check_links --parallels 20 https://example.com/
+check-links --parallels 20 https://example.com/
 
 # Export results to a CSV file
-check_links --export result.csv https://example.com/
+check-links --export result.csv https://example.com/
 
 # Export only failed links to CSV
-check_links --fail --export errors.csv https://example.com/
+check-links --fail --export errors.csv https://example.com/
 
 # Check an authenticated page with multiple headers
-check_links -H 'Authorization: Bearer token' \
+check-links -H 'Authorization: Bearer token' \
   --header 'X-Tenant-ID: 42' \
   https://example.com/private
 ```
@@ -189,7 +203,7 @@ HTTP codes in the table are color-coded by range:
 After changing the design, URL structure, or moving to a new domain, you should make sure that no links point to old (removed) sections or files.
 
 ```sh
-check_links --fail https://example.com/page/
+check-links --fail https://example.com/page/
 ```
 
 The utility shows only links that lead to non-existent pages (404, 410) or server errors (500).
@@ -199,7 +213,7 @@ The utility shows only links that lead to non-existent pages (404, 410) or serve
 Broken external links harm behavioral factors and search-engine trust in your site. Regularly checking external links is a mandatory part of SEO maintenance.
 
 ```sh
-check_links --export broken-links.csv https://example.com/
+check-links --export broken-links.csv https://example.com/
 ```
 
 The CSV file can be opened in Excel/Google Sheets and handed to a content manager for fixing.
@@ -209,7 +223,7 @@ The CSV file can be opened in Excel/Google Sheets and handed to a content manage
 Before publishing content with many external sources, it helps to verify that all links are working and do not lead to 404.
 
 ```sh
-check_links https://blog.example.com/draft-article/
+check-links https://blog.example.com/draft-article/
 ```
 
 Green 200 codes mean everything is fine, yellow 3xx means redirects (worth updating the links to current ones), red 4xx/5xx are broken links.
@@ -220,7 +234,7 @@ For sites with extensive documentation (wikis, knowledge bases, manuals), it is 
 
 ```sh
 # Weekly check via cron
-0 6 * * 1 /usr/local/bin/check_links --fail --export /var/log/links-check/docs-errors.csv https://docs.company.ru/
+0 6 * * 1 /usr/local/bin/check-links --fail --export /var/log/links-check/docs-errors.csv https://docs.company.ru/
 ```
 
 ### 5. Checking links on a product page in an online store
@@ -228,7 +242,7 @@ For sites with extensive documentation (wikis, knowledge bases, manuals), it is 
 Product cards often contain links to related products, categories, and reviews. If such links lead nowhere, it is a direct loss of sales.
 
 ```sh
-check_links --fail https://store.example.com/catalog/product-123/
+check-links --fail https://store.example.com/catalog/product-123/
 ```
 
 ### 6. Auditing a link profile before buying links
@@ -236,7 +250,7 @@ check_links --fail https://store.example.com/catalog/product-123/
 When doing SEO, before buying links from a donor site, it is worth checking whether it has broken pages that could reduce the effect of the purchase.
 
 ```sh
-check_links --fail https://donor-site.example.com/
+check-links --fail https://donor-site.example.com/
 ```
 
 ### 7. Finding images that fail to load
@@ -244,7 +258,7 @@ check_links --fail https://donor-site.example.com/
 The utility collects not only links (`<a href>`) but also images (`<img src>`). This lets you find broken images on a page — a common cause of poor visual perception of a site.
 
 ```sh
-check_links --fail https://example.com/gallery/
+check-links --fail https://example.com/gallery/
 ```
 
 ### 8. Checking redirects (redirect chains)
@@ -252,7 +266,7 @@ check_links --fail https://example.com/gallery/
 Although the utility does not follow redirect chains step by step, it shows the 3xx HTTP code for URLs that redirect. This helps to identify unnecessary intermediate redirects that slow down page loading.
 
 ```sh
-check_links https://example.com/
+check-links https://example.com/
 ```
 
 Pay attention to the yellow rows — these are URLs returning 301, 302, etc.
@@ -262,7 +276,7 @@ Pay attention to the yellow rows — these are URLs returning 301, 302, etc.
 CSV export lets you pass results to BI systems, Google Sheets, or Excel for building reports and dashboards.
 
 ```sh
-check_links --export full-links-report.csv https://example.com/
+check-links --export full-links-report.csv https://example.com/
 ```
 
 ### 10. Quick client site check before a presentation
@@ -270,14 +284,14 @@ check_links --export full-links-report.csv https://example.com/
 For agencies and freelancers: before showing a site to a client, run the home page and typical pages through the utility to avoid an awkward situation with broken links during a demo.
 
 ```sh
-check_links --fail https://client-site.example.com/
+check-links --fail https://client-site.example.com/
 ```
 
 ## Project Structure
 
 | Module | Purpose |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | CLI entry point: argument parsing (including timeout, the number of parallel requests, and the `completion` subcommand), plus explicit error handling with localized messages and correct return codes. |
+| [`src/main.zig`](src/main.zig) | CLI entry point: argument parsing (including timeout, the number of parallel requests, and the `completion` subcommand), terminal width detection, plus explicit error handling with localized messages and correct return codes. |
 | [`src/i18n.zig`](src/i18n.zig) | Typed catalog of localized messages (`ru`/`en`/`es`/`fr`) and active-locale selection via `-Dlocale`. |
 | [`src/lang.zig`](src/lang.zig) | Enum of supported UI languages (used by the build). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestrates link checking for a single page. |
@@ -292,6 +306,7 @@ check_links --fail https://client-site.example.com/
 | [`src/export_csv.zig`](src/export_csv.zig) | Exports results to CSV. |
 | [`src/TableFormatter.zig`](src/TableFormatter.zig) | Table formatting to fit the terminal width. |
 | [`src/bar.zig`](src/bar.zig) | Progress bar for the checking process. |
+| [`src/TerminalSize.zig`](src/TerminalSize.zig) | Terminal size detection (POSIX `ioctl` / Windows API) for the adaptive table, help, and progress bar. |
 | [`src/tests.zig`](src/tests.zig) | Root test file. |
 | [`src/http_integration_test.zig`](src/http_integration_test.zig) | HTTP link-checking integration tests against a local server. |
 
@@ -300,7 +315,7 @@ check_links --fail https://client-site.example.com/
 1. The utility loads the HTML content of the page from the given URL.
 2. The HTML parser extracts all URLs from `href` and `src` attributes.
 3. Relative links are normalized to absolute ones; duplicates are removed.
-4. Each URL is checked concurrently with the `HEAD` method using a custom HTTP HEAD client with a request timeout.
+4. URLs are checked with the `HEAD` method in batches (`--parallels`): requests within a batch run concurrently — one thread per URL — using a custom HTTP HEAD client with a request timeout; batches run sequentially.
 5. Results are grouped by HTTP response code and printed as a table or exported to a CSV file.
 
 ## CSV Format
@@ -324,6 +339,15 @@ zig build test
 ```
 
 Tests cover: HTML parsing (based on `zigquery`), URL normalization, link collection from a page, custom HTTP header parsing and same-origin policy, HTTP code checking against a local test server (including timeouts and redirects), table formatting, and CSV export.
+
+## Release History
+
+| Version | Main changes |
+| --- | --- |
+| [v1.1.1](RELEASE_NOTES_v1.1.1.md) | Infrastructure: up-to-date version in the CLI (`--version` from [`build.zig.zon`](build.zig.zon)), release automation via GitHub Actions, `.deb`/`.rpm` package building, executable renamed to `check-links`, improved CLI error handling. |
+| [v1.1.0](RELEASE_NOTES_v1.1.0.md) | Spanish (`es`) and French (`fr`) language support, multilingual documentation. |
+| [v1.0.0](RELEASE_NOTES_v1.0.0.md) | First stable release: `ru`/`en` localization, release build automation. |
+| [v0.0.4](RELEASE_NOTES_v0.0.4.md) | Custom HTTP headers, request timeout, parallelism, redirect handling. |
 
 ## License
 

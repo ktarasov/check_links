@@ -18,8 +18,7 @@ L'utilitaire charge la page HTML à l'URL indiquée, collecte tous les liens (`<
 - Extraction des URL depuis les attributs `href` des balises `<a>` et `src` des balises `<img>`.
 - Normalisation des liens relatifs en liens absolus à partir du domaine de base (y compris les liens relatifs au protocole `//`).
 - Suppression des URL en double.
-- Vérification concurrente de la disponibilité de chaque URL par la méthode `HEAD` (un thread par URL).
-- Vérification des URL par lots d'une taille configurable : le nombre de requêtes parallèles est défini via `--parallels` (par défaut 5 ; de manière concurrente au sein d'un lot et séquentielle entre les lots).
+- Vérification concurrente des URL par la méthode `HEAD` par lots d'une taille configurable : le nombre de requêtes parallèles est défini via `--parallels` (par défaut 5 ; un thread par URL au sein d'un lot et séquentielle entre les lots).
 - Client HTTP HEAD personnalisé avec prise en charge TLS et délai d'attente de la requête (15 secondes par défaut, configurable via `--timeout`).
 - En-têtes HTTP personnalisés répétables pour les pages authentifiées et les liens du même origine.
 - Regroupement des résultats par code de réponse HTTP.
@@ -30,9 +29,10 @@ L'utilitaire charge la page HTML à l'URL indiquée, collecte tous les liens (`<
 - Export des résultats dans un fichier CSV (délimiteur `;`).
 - Mode « uniquement les erreurs » — affiche seulement les liens en échec.
 - Barre de progression du processus de vérification.
+- Détection automatique de la largeur du terminal (POSIX `ioctl` / API Windows) pour un affichage adaptatif du tableau, de l'aide et de la barre de progression.
 - Internationalisation de l'interface : l'aide CLI, les messages d'erreur et d'avertissement, les en-têtes du tableau et du CSV, ainsi que le modèle de la barre de progression sont compilés en russe, anglais, espagnol ou français via l'option de compilation `-Dlocale` (par défaut `ru`).
 - Génération d'un script de complétion automatique de la ligne de commande via la sous-commande `completion`. Les shells `bash`, `zsh`, `fish` et `nushell` sont pris en charge.
-- Gestion explicite des erreurs de l'application dans la fonction `main` : les erreurs d'analyse des arguments, d'initialisation de l'analyseur, des en-têtes et de génération du script de complétion sont affichées comme un message localisé sur stderr, et le processus se termine avec un code de retour non nul.
+- Gestion explicite des erreurs de l'application dans la fonction `main` : les erreurs d'analyse des arguments (y compris inconnues — un message localisé est affiché au lieu d'une stack trace technique), d'initialisation de l'analyseur, des en-têtes et de génération du script de complétion sont affichées comme un message localisé sur stderr, et le processus se termine avec un code de retour non nul.
 
 ## Prérequis
 
@@ -51,13 +51,13 @@ Clonez le dépôt et compilez le projet :
 zig build
 ```
 
-Le fichier binaire apparaîtra dans `zig-out/bin/`.
+Le fichier binaire apparaîtra dans `zig-out/bin/` sous le nom `check-links`.
 
 ### Commandes de compilation
 
 | Commande | Description |
 | --- | --- |
-| `zig build` | Compile l'exécutable (`check_links`). |
+| `zig build` | Compile l'exécutable (`check-links`). |
 | `zig build run -- <arguments>` | Compile et exécute l'utilitaire. |
 | `zig build test` | Exécute tous les tests. |
 | `zig build release` | Compile les binaires de version (archives compressées) pour plusieurs plateformes. |
@@ -75,6 +75,20 @@ Le fichier binaire apparaîtra dans `zig-out/bin/`.
 - `x86_64-macos`
 - `aarch64-macos`
 
+Noms des archives : `check-links-<arch>-<os>-<locale>.tar.gz` (Linux/macOS) et `check-links-<arch>-<os>-<locale>.zip` (Windows).
+
+Pour Linux, des paquets d'installation `.deb` et `.rpm` sont également compilés (un par locale) ; le binaire est installé dans `/usr/bin/check-links`.
+
+### Publication automatique des versions (GitHub Actions)
+
+Le projet utilise GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) : à la création d'un tag `v*` ou manuellement (`workflow_dispatch`), le workflow :
+
+1. exécute les tests (`zig build test`) ;
+2. compile les archives de version (`zig build release`) ;
+3. vérifie la présence du fichier `RELEASE_NOTES_<tag>.md` — la publication s'arrête avec une erreur s'il est absent ;
+4. compile les paquets `.deb` et `.rpm` pour les quatre locales ;
+5. publie un brouillon de GitHub Release avec les archives, les paquets et le texte des notes de version.
+
 ### Localisation
 
 L'interface de l'utilitaire (aide CLI, messages d'erreur et d'avertissement, en-têtes du tableau et du CSV, modèle de la barre de progression) peut être compilée en russe, anglais, espagnol ou français. La langue est définie au moment de la compilation via l'option `-Dlocale` (par défaut — le russe) :
@@ -91,7 +105,7 @@ Les textes de localisation sont stockés dans le catalogue typé [`src/i18n.zig`
 ## Utilisation
 
 ```sh
-check_links <URL> [options]
+check-links <URL> [options]
 ```
 
 ### Paramètres
@@ -110,23 +124,23 @@ check_links <URL> [options]
 Génère un script de complétion pour l'environnement dans lequel l'utilitaire est exécuté. Le type de shell est détecté automatiquement à partir de la variable d'environnement `$SHELL`. Les shells `bash`, `zsh`, `fish` et `nushell` sont pris en charge.
 
 ```sh
-check_links completion
+check-links completion
 ```
 
 Le script est écrit sur le flux de sortie standard, vous pouvez donc le rediriger vers le fichier de chargement automatique de votre shell :
 
 ```sh
 # bash
-check_links completion > ~/.bash_completion
+check-links completion > ~/.bash_completion
 
 # zsh
-check_links completion > ${fpath[1]}/_check_links
+check-links completion > ${fpath[1]}/_check-links
 
 # fish
-check_links completion > ~/.config/fish/completions/check_links.fish
+check-links completion > ~/.config/fish/completions/check-links.fish
 
 # nushell
-check_links completion > check_links-completions.nu
+check-links completion > check-links-completions.nu
 ```
 
 Si le type de shell ne peut pas être déterminé ou si une erreur se produit lors de la génération, l'utilitaire affiche un message d'erreur sur stderr et se termine avec un code de retour non nul.
@@ -135,28 +149,28 @@ Si le type de shell ne peut pas être déterminé ou si une erreur se produit lo
 
 ```sh
 # Vérifier tous les liens d'une page et afficher le tableau dans le terminal
-check_links https://example.com/
+check-links https://example.com/
 
 # Générer un script de complétion pour le shell actuel
-check_links completion
+check-links completion
 
 # Afficher uniquement les liens en erreur
-check_links --fail https://example.com/
+check-links --fail https://example.com/
 
 # Augmenter le délai d'attente de la requête à 60 secondes
-check_links --timeout 60 https://example.com/
+check-links --timeout 60 https://example.com/
 
 # Augmenter le nombre de requêtes parallèles (par exemple, à 20)
-check_links --parallels 20 https://example.com/
+check-links --parallels 20 https://example.com/
 
 # Exporter les résultats dans un fichier CSV
-check_links --export result.csv https://example.com/
+check-links --export result.csv https://example.com/
 
 # Exporter uniquement les liens en erreur au format CSV
-check_links --fail --export errors.csv https://example.com/
+check-links --fail --export errors.csv https://example.com/
 
 # Vérifier une page authentifiée avec plusieurs en-têtes
-check_links -H 'Authorization: Bearer token' \
+check-links -H 'Authorization: Bearer token' \
   --header 'X-Tenant-ID: 42' \
   https://example.com/private
 ```
@@ -189,7 +203,7 @@ Les codes HTTP du tableau sont colorés selon le plage :
 Après un changement de design, de structure des URL ou un déménagement vers un nouveau domaine, il faut s'assurer qu'il ne reste pas de liens vers d'anciennes sections (supprimées) ou fichiers.
 
 ```sh
-check_links --fail https://mon-site.fr/page/
+check-links --fail https://mon-site.fr/page/
 ```
 
 L'utilitaire n'affichera que les liens qui mènent à des pages inexistantes (404, 410) ou à des erreurs serveur (500).
@@ -199,7 +213,7 @@ L'utilitaire n'affichera que les liens qui mènent à des pages inexistantes (40
 Les liens externes cassés nuisent aux facteurs comportementaux et à la confiance des moteurs de recherche envers votre site. Vérifier régulièrement les liens externes est une partie obligatoire du maintien SEO.
 
 ```sh
-check_links --export broken-links.csv https://mon-site.fr/
+check-links --export broken-links.csv https://mon-site.fr/
 ```
 
 Le fichier CSV peut être ouvert dans Excel/Google Sheets et confié au responsable de contenu pour correction.
@@ -209,7 +223,7 @@ Le fichier CSV peut être ouvert dans Excel/Google Sheets et confié au responsa
 Avant de publier un contenu avec de nombreuses sources externes, il est utile de s'assurer que tous les liens fonctionnent et ne mènent pas à une 404.
 
 ```sh
-check_links https://blog.mon-site.fr/brouillon-article/
+check-links https://blog.mon-site.fr/brouillon-article/
 ```
 
 Codes verts 200 — tout va bien, jaunes 3xx — redirections (il vaut mieux mettre à jour les liens vers les actuels), rouges 4xx/5xx — liens cassés.
@@ -220,7 +234,7 @@ Pour les sites avec une documentation volumineuse (wikis, bases de connaissances
 
 ```sh
 # Vérification hebdomadaire via cron
-0 6 * * 1 /usr/local/bin/check_links --fail --export /var/log/links-check/docs-errors.csv https://docs.company.ru/
+0 6 * * 1 /usr/local/bin/check-links --fail --export /var/log/links-check/docs-errors.csv https://docs.company.ru/
 ```
 
 ### 5. Vérification des liens sur la page d'un produit d'une boutique en ligne
@@ -228,7 +242,7 @@ Pour les sites avec une documentation volumineuse (wikis, bases de connaissances
 Dans les fiches produits, il y a souvent des liens vers des produits associés, des catégories et des avis. Si ces liens ne mènent nulle part, ce sont des pertes de ventes directes.
 
 ```sh
-check_links --fail https://boutique.mon-site.fr/catalogue/produit-123/
+check-links --fail https://boutique.mon-site.fr/catalogue/produit-123/
 ```
 
 ### 6. Audit de la masse de liens avant d'acheter des liens
@@ -236,7 +250,7 @@ check_links --fail https://boutique.mon-site.fr/catalogue/produit-123/
 Lors de l'optimisation SEO, avant d'acheter des liens à un site donateur, il convient de vérifier s'il ne contient pas de pages cassées qui pourraient réduire l'effet de l'achat.
 
 ```sh
-check_links --fail https://site-donateur.mon-site.fr/
+check-links --fail https://site-donateur.mon-site.fr/
 ```
 
 ### 7. Recherche d'images qui ne se chargent pas
@@ -244,7 +258,7 @@ check_links --fail https://site-donateur.mon-site.fr/
 L'utilitaire collecte non seulement les liens (`<a href>`), mais aussi les images (`<img src>`). Cela permet de trouver des images cassées sur une page — une cause fréquente de la dégradation de la perception visuelle du site.
 
 ```sh
-check_links --fail https://mon-site.fr/galerie/
+check-links --fail https://mon-site.fr/galerie/
 ```
 
 ### 8. Vérification des redirections (chaînes de redirection)
@@ -252,7 +266,7 @@ check_links --fail https://mon-site.fr/galerie/
 Bien que l'utilitaire ne suive pas les chaînes de redirection étape par étape, il affiche le code HTTP 3xx pour les URL qui redirigent. Cela aide à identifier les redirections intermédiaires inutiles qui ralentissent le chargement de la page.
 
 ```sh
-check_links https://example.com/
+check-links https://example.com/
 ```
 
 Faites attention aux lignes jaunes — ce sont des URL qui renvoient 301, 302, etc.
@@ -262,7 +276,7 @@ Faites attention aux lignes jaunes — ce sont des URL qui renvoient 301, 302, e
 L'export CSV permet de transmettre les résultats à des systèmes BI, Google Sheets ou Excel pour élaborer des rapports et des tableaux de bord.
 
 ```sh
-check_links --export full-links-report.csv https://mon-site.fr/
+check-links --export full-links-report.csv https://mon-site.fr/
 ```
 
 ### 10. Vérification rapide du site d'un client avant une présentation
@@ -270,14 +284,14 @@ check_links --export full-links-report.csv https://mon-site.fr/
 Pour les agences et les freelances : avant de montrer un site à un client, il vaut la peine de faire passer la page d'accueil et les pages types par l'utilitaire pour éviter une situation gênante avec des liens cassés lors de la démo.
 
 ```sh
-check_links --fail https://site-du-client.mon-site.fr/
+check-links --fail https://site-du-client.mon-site.fr/
 ```
 
 ## Structure du projet
 
 | Module | Fonction |
 | --- | --- |
-| [`src/main.zig`](src/main.zig) | Point d'entrée CLI : analyse des arguments (y compris le délai d'attente, le nombre de requêtes parallèles et la sous-commande `completion`), ainsi que la gestion explicite des erreurs avec des messages localisés et des codes de retour corrects. |
+| [`src/main.zig`](src/main.zig) | Point d'entrée CLI : analyse des arguments (y compris le délai d'attente, le nombre de requêtes parallèles et la sous-commande `completion`), détection de la largeur du terminal, ainsi que la gestion explicite des erreurs avec des messages localisés et des codes de retour corrects. |
 | [`src/i18n.zig`](src/i18n.zig) | Catalogue typé de messages localisés (`ru`/`en`/`es`/`fr`) et sélection de la localisation active via `-Dlocale`. |
 | [`src/lang.zig`](src/lang.zig) | Énumération des langues d'interface prises en charge (utilisée par la compilation). |
 | [`src/check_links_by_page.zig`](src/check_links_by_page.zig) | Orchestration de la vérification des liens d'une page. |
@@ -292,6 +306,7 @@ check_links --fail https://site-du-client.mon-site.fr/
 | [`src/export_csv.zig`](src/export_csv.zig) | Export des résultats au format CSV. |
 | [`src/TableFormatter.zig`](src/TableFormatter.zig) | Formatage du tableau selon la largeur du terminal. |
 | [`src/bar.zig`](src/bar.zig) | Barre de progression du processus de vérification. |
+| [`src/TerminalSize.zig`](src/TerminalSize.zig) | Détection de la taille du terminal (POSIX `ioctl` / API Windows) pour le tableau, l'aide et la barre de progression adaptatifs. |
 | [`src/tests.zig`](src/tests.zig) | Fichier racine des tests. |
 | [`src/http_integration_test.zig`](src/http_integration_test.zig) | Tests d'intégration HTTP sur un serveur local. |
 
@@ -300,7 +315,7 @@ check_links --fail https://site-du-client.mon-site.fr/
 1. L'utilitaire charge le contenu HTML de la page depuis l'URL indiquée.
 2. L'analyseur HTML extrait toutes les URL des attributs `href` et `src`.
 3. Les liens relatifs sont normalisés en liens absolus ; les doublons sont supprimés.
-4. Chaque URL est vérifiée par la méthode `HEAD` de manière concurrente ; un client HTTP HEAD personnalisé avec délai d'attente est utilisé pour la vérification.
+4. Les URL sont vérifiées par la méthode `HEAD` par lots (`--parallels`) : au sein d'un lot, les requêtes sont exécutées de manière concurrente — un thread par URL — à l'aide d'un client HTTP HEAD personnalisé avec délai d'attente ; entre les lots — séquentiellement.
 5. Les résultats sont regroupés par code de réponse HTTP et affichés sous forme de tableau ou de fichier CSV.
 
 ## Format CSV
@@ -324,6 +339,15 @@ zig build test
 ```
 
 Les tests couvrent : l'analyse HTML (basée sur `zigquery`), la normalisation des URL, la collecte des liens d'une page, l'analyse des en-têtes HTTP personnalisés et la politique de même origine, la vérification des codes HTTP sur un serveur de test local (y compris les délais d'attente et les redirections), le formatage du tableau et l'export CSV.
+
+## Historique des versions
+
+| Version | Principaux changements |
+| --- | --- |
+| [v1.1.1](RELEASE_NOTES_v1.1.1.md) | Infrastructure : version à jour dans la CLI (`--version` depuis [`build.zig.zon`](build.zig.zon)), automatisation des versions via GitHub Actions, compilation des paquets `.deb`/`.rpm`, exécutable renommé en `check-links`, amélioration de la gestion des erreurs CLI. |
+| [v1.1.0](RELEASE_NOTES_v1.1.0.md) | Prise en charge des langues espagnole (`es`) et française (`fr`), documentation multilingue. |
+| [v1.0.0](RELEASE_NOTES_v1.0.0.md) | Première version stable : localisation `ru`/`en`, automatisation de la compilation de version. |
+| [v0.0.4](RELEASE_NOTES_v0.0.4.md) | En-têtes HTTP personnalisés, délai d'attente de la requête, parallélisme, gestion des redirections. |
 
 ## Licence
 
