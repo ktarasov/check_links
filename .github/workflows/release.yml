@@ -45,7 +45,7 @@ jobs:
       - name: Build release artifacts
         run: zig build release
 
-      - name: Check and read release notes
+      - name: Check and expose release notes
         id: notes
         run: |
           TAG="${{ github.ref_name }}"
@@ -56,15 +56,11 @@ jobs:
             exit 1
           fi
 
+          # Тело релиза НЕ копируем через GITHUB_OUTPUT: heredoc ломается, если
+          # файл не заканчивается переводом строки, содержит CRLF или
+          # escape-последовательности (runner их обрабатывает). softprops/
+          # action-gh-release принимает body_path — передаём путь к файлу.
           echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
-          # Уникальный разделитель: тело заметок не сломается,
-          # даже если в файле встретится строка "EOF".
-          DELIM="GH_RELEASE_NOTES_$(date +%s%N)"
-          {
-            echo "body<<$DELIM"
-            cat "$NOTES_FILE"
-            echo "$DELIM"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Build .deb and .rpm packages
         run: |
@@ -143,7 +139,7 @@ jobs:
             zig-out/compressed/*
             packages/*.deb
             packages/*.rpm
-          body: ${{ steps.notes.outputs.body }}
+          body_path: ${{ steps.notes.outputs.notes_file }}
           generate_release_notes: false
           draft: true
           prerelease: false
