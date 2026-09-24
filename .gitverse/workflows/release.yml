@@ -32,10 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           # p7zip-full — 7z нужен для сборки Windows-архивов (.zip), см. build.zig
-          # rpm — предоставляет rpmbuild, необходимый fpm для сборки .rpm
-          # fakeroot — требуется fpm для сборки .deb
-          sudo apt-get install -y p7zip-full ruby ruby-dev rpm fakeroot
-          sudo gem install fpm --no-document
+          sudo apt-get install -y p7zip-full 
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v2
@@ -61,76 +58,6 @@ jobs:
           # escape-последовательности (runner их обрабатывает). softprops/
           # action-gh-release принимает body_path — передаём путь к файлу.
           echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
-
-      - name: Build .deb and .rpm packages
-        run: |
-          VERSION="${{ github.ref_name }}"
-          # Убираем ведущую 'v' для номера версии в пакетах
-          PKG_VERSION="${VERSION#v}"
-
-          # Предупреждение при расхождении версии тега и версии из build.zig.zon
-          ZON_VERSION=$(grep -oP '\.version = "\K[^"]+' build.zig.zon | head -1 || true)
-          if [ -n "$ZON_VERSION" ] && [ "$ZON_VERSION" != "$PKG_VERSION" ]; then
-            echo "::warning::Версия в build.zig.zon ($ZON_VERSION) не совпадает с тегом ($PKG_VERSION)"
-          fi
-
-          # Директория для готовых пакетов
-          mkdir -p packages
-
-          # nullglob: не подставлять литерал, если архивов нет
-          shopt -s nullglob
-          ARCHIVES=(zig-out/compressed/*linux*.tar.gz)
-          if [ ${#ARCHIVES[@]} -eq 0 ]; then
-            echo "::error::Не найдено ни одного Linux-архива в zig-out/compressed/"
-            exit 1
-          fi
-
-          for archive in "${ARCHIVES[@]}"; do
-            # Извлекаем локаль из имени архива без grep -P
-            # Пример: check-links-x86_64-linux-en.tar.gz -> en
-            BASENAME=$(basename "$archive")
-            LOCALE="${BASENAME##*-}"
-            LOCALE="${LOCALE%.tar.gz}"
-
-            case "$LOCALE" in
-              ru|en|es|fr) ;;
-              *)
-                echo "::error::Нераспознанная локаль '$LOCALE' в $archive"
-                exit 1
-                ;;
-            esac
-
-            # Временная директория для распаковки
-            TMPDIR=$(mktemp -d)
-            tar -xzf "$archive" -C "$TMPDIR"
-
-            # Находим бинарник
-            BIN=$(find "$TMPDIR" -type f -name "check-links" | head -1)
-
-            if [ -z "$BIN" ]; then
-              echo "::error::Бинарник не найден в архиве $archive"
-              rm -rf "$TMPDIR"
-              exit 1
-            fi
-
-            # Создаём .deb и .rpm. Архитектура x86_64 (только такие Linux-таргеты),
-            # fpm сам сопоставит её с amd64 для deb. -p packages/ кладёт пакеты сразу в нужную папку.
-            for pkg_type in deb rpm; do
-              fpm \
-                -s dir \
-                -t "$pkg_type" \
-                -n "check_links_${LOCALE}" \
-                -v "$PKG_VERSION" \
-                -a x86_64 \
-                -p packages/ \
-                --description "CLI utility for checking links on a web page (locale: ${LOCALE})" \
-                --url "https://github.com/ktarasov/check_links" \
-                --license MIT \
-                "${BIN}=/usr/bin/check-links"
-            done
-
-            rm -rf "$TMPDIR"
-          done
 
       - name: Create and publish GitVerse Release
         # softprops/action-gh-release на GitVerse не работает: он обращается к
@@ -186,7 +113,7 @@ jobs:
 
           # Загружаем ассеты (архивы + .deb + .rpm).
           shopt -s nullglob
-          ASSETS=(zig-out/compressed/* packages/*.deb packages/*.rpm)
+          ASSETS=(zig-out/compressed/*)
           if [ ${#ASSETS[@]} -eq 0 ]; then
             echo "::error::Нет файлов для загрузки в релиз."
             exit 1
