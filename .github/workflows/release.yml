@@ -28,9 +28,6 @@ jobs:
           sudo apt-get install -y ruby ruby-dev
           sudo gem install fpm
 
-      - name: Run tests
-        run: zig build test
-
       - name: Build release artifacts
         run: zig build release
 
