@@ -7,6 +7,7 @@ const i18n = @import("i18n.zig");
 const Io = std.Io;
 const TerminalSize = @import("TerminalSize.zig");
 const build_options = @import("build_options");
+const prints = @import("prints.zig");
 
 extern "kernel32" fn SetConsoleOutputCP(wCodePageID: std.os.windows.UINT) callconv(.winapi) std.os.windows.BOOL;
 
@@ -49,7 +50,7 @@ pub fn main(init: std.process.Init) u8 {
             },
         },
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00001");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00001");
         return 1;
     };
     defer parser.deinit();
@@ -58,7 +59,7 @@ pub fn main(init: std.process.Init) u8 {
         .short = 'f',
         .help = i18n.Current.help_fail,
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00002");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00002");
         return 1;
     };
 
@@ -66,7 +67,7 @@ pub fn main(init: std.process.Init) u8 {
         .short = 'e',
         .help = i18n.Current.help_export,
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00003");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00003");
         return 1;
     };
 
@@ -77,7 +78,7 @@ pub fn main(init: std.process.Init) u8 {
         .max = 3600,
         .default = "15",
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00004");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00004");
         return 1;
     };
 
@@ -88,7 +89,7 @@ pub fn main(init: std.process.Init) u8 {
         .max = 100,
         .default = "5",
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00005");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00005");
         return 1;
     };
 
@@ -97,7 +98,7 @@ pub fn main(init: std.process.Init) u8 {
         .metavar = "NAME: VALUE",
         .help = i18n.Current.help_header,
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00006");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00006");
         return 1;
     };
 
@@ -105,7 +106,7 @@ pub fn main(init: std.process.Init) u8 {
         .help = i18n.Current.help_url,
         .required = true,
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00007");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00007");
         return 1;
     };
 
@@ -113,7 +114,7 @@ pub fn main(init: std.process.Init) u8 {
         .name = "completion",
         .help = i18n.Current.completion,
     }) catch {
-        printError(io, i18n.Current.err_init_parser ++ "00008");
+        prints.printError(io, i18n.Current.err_init_parser ++ "00008");
         return 1;
     };
 
@@ -122,7 +123,7 @@ pub fn main(init: std.process.Init) u8 {
             error.OutOfMemory => i18n.Current.err_out_of_memory,
             else => i18n.Current.err_unknown,
         };
-        printError(io, message);
+        prints.printError(io, message);
         return 1;
     };
     defer result.deinit();
@@ -132,19 +133,19 @@ pub fn main(init: std.process.Init) u8 {
         if (std.mem.eql(u8, cmd, "completion")) {
             if (detectShell(init.environ_map)) |shell| {
                 const script = parser.generateCompletion(shell) catch {
-                    printError(io, i18n.Current.err_generate_completion);
+                    prints.printError(io, i18n.Current.err_generate_completion);
                     return 1;
                 };
                 defer arena.free(script);
 
                 var stdout = std.Io.File.stdout().writer(io, &.{});
                 stdout.interface.writeAll(script) catch {
-                    printError(io, i18n.Current.err_generate_completion);
+                    prints.printError(io, i18n.Current.err_generate_completion);
                     return 1;
                 };
                 return 0;
             } else {
-                printError(io, i18n.Current.err_no_shell);
+                prints.printError(io, i18n.Current.err_no_shell);
                 return 1;
             }
         }
@@ -152,7 +153,7 @@ pub fn main(init: std.process.Init) u8 {
 
     const raw_headers = result.getArray("header") orelse &.{};
     var headers = request_headers.parse(arena, raw_headers) catch |err| {
-        printHeaderError(io, err);
+        prints.printHeaderError(io, err);
         return 1;
     };
     defer headers.deinit(arena);
@@ -168,7 +169,7 @@ pub fn main(init: std.process.Init) u8 {
             .terminal_width = terminal_width,
         });
     } else {
-        printError(io, i18n.Current.err_no_url);
+        prints.printError(io, i18n.Current.err_no_url);
         return 1;
     }
 }
@@ -181,23 +182,4 @@ fn detectShell(env: *std.process.Environ.Map) ?args.Shell {
         if (std.mem.endsWith(u8, shell_path, "nushell")) return .nushell;
     }
     return null;
-}
-
-fn printHeaderError(io: Io, err: anyerror) void {
-    const message = switch (err) {
-        error.InvalidHeaderFormat => i18n.Current.err_header_format,
-        error.InvalidHeaderName => i18n.Current.err_header_name,
-        error.InvalidHeaderValue => i18n.Current.err_header_value,
-        error.ManagedFramingHeader => i18n.Current.err_header_managed,
-        else => i18n.Current.err_header_other,
-    };
-
-    printError(io, message);
-}
-
-fn printError(io: Io, message: []const u8) void {
-    var buffer: [1024]u8 = undefined;
-    var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("\x1b[31m{s}\x1b[0m {s}\n", .{ i18n.Current.err_prefix, message }) catch {};
-    writer.flush() catch {};
 }

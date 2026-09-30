@@ -10,6 +10,7 @@ const check_link_list = @import("check_link_list.zig");
 const table_view = @import("table_view.zig");
 const export_csv = @import("export_csv.zig");
 const i18n = @import("i18n.zig");
+const prints = @import("prints.zig");
 
 /// Параметры запуска проверки ссылок на странице.
 pub const Options = struct {
@@ -44,9 +45,9 @@ pub fn run(
     // 1. Сбор всех URL с указанной страницы.
     var url_list = collect_urls.collectUrls(io, allocator, options.url, options.headers) catch |err| {
         switch (err) {
-            error.LoadFailed => printError(io, i18n.Current.err_load_failed, .{options.url}),
-            error.InvalidUrl => printError(io, i18n.Current.err_invalid_url, .{options.url}),
-            else => printError(io, i18n.Current.err_load_failed, .{options.url}),
+            error.LoadFailed => prints.printErrorFmt(io, i18n.Current.err_load_failed, .{options.url}),
+            error.InvalidUrl => prints.printErrorFmt(io, i18n.Current.err_invalid_url, .{options.url}),
+            else => prints.printErrorFmt(io, i18n.Current.err_load_failed, .{options.url}),
         }
         return 1;
     };
@@ -57,7 +58,7 @@ pub fn run(
 
     // 2. Если URL не найдены — вывод предупреждения и завершение.
     if (url_list.items.len == 0) {
-        printWarning(io, i18n.Current.warn_no_urls, .{options.url});
+        prints.printWarningFmt(io, i18n.Current.warn_no_urls, .{options.url});
         return 0;
     }
 
@@ -75,7 +76,7 @@ pub fn run(
         options.terminal_width,
         &stderr_writer.interface,
     ) catch {
-        printError(io, i18n.Current.err_check_links, .{});
+        prints.printError(io, i18n.Current.err_check_links);
         return 1;
     };
     defer checked_list.deinit();
@@ -83,31 +84,15 @@ pub fn run(
     // 5. Вывод результатов.
     if (options.export_filename) |file_name| {
         export_csv.exportCsv(io, allocator, options.url, &checked_list, options.fail, file_name) catch |err| {
-            printError(io, i18n.Current.err_export_csv, .{@errorName(err)});
+            prints.printErrorFmt(io, i18n.Current.err_export_csv, .{@errorName(err)});
             return 1;
         };
     } else {
         table_view.renderTableView(io, allocator, options.url, &checked_list, options.fail) catch {
-            printError(io, i18n.Current.err_render_table, .{});
+            prints.printError(io, i18n.Current.err_render_table);
             return 1;
         };
     }
 
     return 0;
-}
-
-/// Выводит сообщение об ошибке в stderr.
-fn printError(io: std.Io, comptime fmt: []const u8, args: anytype) void {
-    var buffer: [4096]u8 = undefined;
-    var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("\x1b[0;31m{s}\x1b[0m " ++ fmt ++ "\n", .{i18n.Current.err_prefix} ++ args) catch {};
-    writer.flush() catch {};
-}
-
-/// Выводит предупреждение в stderr.
-fn printWarning(io: std.Io, comptime fmt: []const u8, args: anytype) void {
-    var buffer: [4096]u8 = undefined;
-    var writer = std.Io.File.stderr().writer(io, &buffer);
-    writer.interface.print("\x1b[0;33m{s}\x1b[0m " ++ fmt ++ "\n", .{i18n.Current.warn_prefix} ++ args) catch {};
-    writer.flush() catch {};
 }
