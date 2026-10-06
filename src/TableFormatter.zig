@@ -94,9 +94,10 @@ pub const Colors = enum {
 
     /// Попытка распознать цвет по имени; возвращает null, если имя неизвестно.
     pub fn parse(name: []const u8) ?Colors {
-        inline for (@typeInfo(Colors).@"enum".fields) |f| {
-            if (std.mem.eql(u8, name, f.name)) {
-                return @enumFromInt(f.value);
+        const color_info = @typeInfo(Colors).@"enum";
+        inline for (color_info.field_names, color_info.field_values) |field_name, field_value| {
+            if (std.mem.eql(u8, name, field_name)) {
+                return @fromBackingInt(field_value);
             }
         }
         return null;
