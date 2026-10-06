@@ -32,6 +32,7 @@ const Uri = std.Uri;
 const tls = std.crypto.tls.Client;
 const Certificate = std.crypto.Certificate;
 const http = std.http;
+const HostName = net.HostName;
 const request_headers = @import("request_headers.zig");
 
 /// Порт по умолчанию для HTTP.
@@ -123,8 +124,8 @@ pub fn check(self: *HttpHeadClient, url: []const u8) Error!u16 {
 
     const port: u16 = uri.port orelse (if (is_tls) default_https_port else default_http_port);
 
-    var host_buffer: [net.HostName.max_len]u8 = undefined;
-    const host = uri.getHost(&host_buffer) catch return error.UriMissingHost;
+    var host_buffer: [HostName.max_len]u8 = undefined;
+    const host = HostName.fromUri(uri, &host_buffer) catch return error.UriMissingHost;
 
     // TCP-connect с таймаутом (см. `connectWithTimeout`).
     const stream = try self.connectWithTimeout(host, port);

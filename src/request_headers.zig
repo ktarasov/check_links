@@ -1,6 +1,7 @@
 //! Разбор пользовательских HTTP-заголовков и политика их отправки.
 
 const std = @import("std");
+const HostName = std.Io.net.HostName;
 
 pub const HeaderList = std.ArrayList(std.http.Header);
 
@@ -60,10 +61,10 @@ pub fn sameOrigin(left_url: []const u8, right_url: []const u8) bool {
     if (left_port != right_port) return false;
     if (!std.ascii.eqlIgnoreCase(left.scheme, right.scheme)) return false;
 
-    var left_buffer: [std.Io.net.HostName.max_len]u8 = undefined;
-    var right_buffer: [std.Io.net.HostName.max_len]u8 = undefined;
-    const left_host = left.getHost(&left_buffer) catch return false;
-    const right_host = right.getHost(&right_buffer) catch return false;
+    var left_buffer: [HostName.max_len]u8 = undefined;
+    var right_buffer: [HostName.max_len]u8 = undefined;
+    const left_host = HostName.fromUri(left, &left_buffer) catch return false;
+    const right_host = HostName.fromUri(right, &right_buffer) catch return false;
     return std.ascii.eqlIgnoreCase(left_host.bytes, right_host.bytes);
 }
 
