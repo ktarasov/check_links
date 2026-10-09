@@ -2,7 +2,7 @@
 
 Read this document in other languages: [Русский](README.md) · [Español](README.es.md) · [Français](README.fr.md)
 
-🌐 [Project website](https://kvt.github.io/check-links.zig/) · [Русский](https://kvt.github.io/check-links.zig/) · [Español](https://kvt.github.io/check-links.zig/es.html) · [Français](https://kvt.github.io/check-links.zig/fr.html)
+🌐 [Project website](https://ktarasov.github.io/check_links/) · [Русский](https://ktarasov.github.io/check_links/) · [Español](https://ktarasov.github.io/check_links/es.html) · [Français](https://ktarasov.github.io/check_links/fr.html)
 
 ---
 

@@ -2,7 +2,7 @@
 
 Léelo en otros idiomas: [Русский](README.md) · [English](README.en.md) · [Français](README.fr.md)
 
-🌐 [Sitio web del proyecto](https://kvt.github.io/check-links.zig/) · [Русский](https://kvt.github.io/check-links.zig/) · [English](https://kvt.github.io/check-links.zig/en.html) · [Français](https://kvt.github.io/check-links.zig/fr.html)
+🌐 [Sitio web del proyecto](https://ktarasov.github.io/check_links/) · [Русский](https://ktarasov.github.io/check_links/) · [English](https://ktarasov.github.io/check_links/en.html) · [Français](https://ktarasov.github.io/check_links/fr.html)
 
 ---
 
