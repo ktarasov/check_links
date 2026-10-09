@@ -2,6 +2,8 @@
 
 Читайте на других языках: [English](README.en.md) · [Español](README.es.md) · [Français](README.fr.md)
 
+🌐 [Сайт проекта](https://kvt.github.io/check-links.zig/) · [English](https://kvt.github.io/check-links.zig/en.html) · [Español](https://kvt.github.io/check-links.zig/es.html) · [Français](https://kvt.github.io/check-links.zig/fr.html)
+
 ---
 
 ## О проекте
