@@ -28,7 +28,7 @@
     <p class="subtitle">
       Консольная утилита на языке <strong>Zig</strong> для проверки ссылок
       на веб-странице: загружает страницу, собирает все ссылки
-      (<code><a href></code>) и изображения (<code><img src></code>)
+      (<code>&lt;a href&gt;</code>) и изображения (<code>&lt;img src&gt;</code>)
       и проверяет каждый URL на доступность.
     </p>
     <a class="btn btn-primary" href="https://github.com/kvt/check-links.zig/releases">Скачать релиз</a>
@@ -39,7 +39,7 @@
     <h2>Возможности</h2>
     <ul class="features">
       <li>Загрузка страниц по схемам <code>http://</code>, <code>https://</code> и <code>file://</code></li>
-      <li>Извлечение URL из <code>href</code> тегов <code><a></code> и <code>src</code> тегов <code><img></code></li>
+      <li>Извлечение URL из <code>href</code> тегов <code>&lt;a&gt;</code> и <code>src</code> тегов <code>&lt;img&gt;></code></li>
       <li>Нормализация относительных ссылок и удаление дубликатов</li>
       <li>Конкурентная проверка методом <code>HEAD</code> партиями (по умолчанию 5 параллельных запросов)</li>
       <li>Собственный HTTP HEAD-клиент с TLS и настраиваемым таймаутом (по умолчанию 15 секунд)</li>

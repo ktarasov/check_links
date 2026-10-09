@@ -28,8 +28,8 @@
     <p class="subtitle">
       Utilidad de línea de comandos en <strong>Zig</strong> para comprobar
       los enlaces de una página web: descarga la página, recopila todos los
-      enlaces (<code><a href></code>) e imágenes
-      (<code><img src></code>) y verifica la disponibilidad de cada URL.
+      enlaces (<code>&lt;a href&gt;</code>) e imágenes
+      (<code>&lt;img src&gt;</code>) y verifica la disponibilidad de cada URL.
     </p>
     <a class="btn btn-primary" href="https://github.com/kvt/check-links.zig/releases">Descargar versión</a>
     <a class="btn" href="https://github.com/kvt/check-links.zig">Repositorio en GitHub</a>
@@ -39,7 +39,7 @@
     <h2>Características</h2>
     <ul class="features">
       <li>Carga páginas con esquemas <code>http://</code>, <code>https://</code> y <code>file://</code></li>
-      <li>Extrae URLs de <code>href</code> en etiquetas <code><a></code> y <code>src</code> en <code><img></code></li>
+      <li>Extrae URLs de <code>href</code> en etiquetas <code>&lt;a&gt;</code> y <code>src</code> en <code>&lt;img&gt;</code></li>
       <li>Normaliza enlaces relativos y elimina duplicados</li>
       <li>Verificación concurrente con <code>HEAD</code> por lotes (5 peticiones paralelas por defecto)</li>
       <li>Cliente HTTP HEAD propio con TLS y timeout configurable (15 segundos por defecto)</li>

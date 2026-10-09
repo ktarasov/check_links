@@ -27,8 +27,8 @@
     <h1>CheckLinks</h1>
     <p class="subtitle">
       A <strong>Zig</strong> CLI utility for checking links on a web page:
-      it downloads the page, collects all links (<code><a href></code>)
-      and images (<code><img src></code>), and verifies that every URL
+      it downloads the page, collects all links (<code>&lt;a href&gt;</code>)
+      and images (<code>&lt;img src&gt;</code>), and verifies that every URL
       is reachable.
     </p>
     <a class="btn btn-primary" href="https://github.com/kvt/check-links.zig/releases">Download release</a>
@@ -39,7 +39,7 @@
     <h2>Features</h2>
     <ul class="features">
       <li>Loads pages via <code>http://</code>, <code>https://</code> and <code>file://</code></li>
-      <li>Extracts URLs from <code>href</code> of <code><a></code> tags and <code>src</code> of <code><img></code> tags</li>
+      <li>Extracts URLs from <code>href</code> of <code>&lt;a&gt;</code> tags and <code>src</code> of <code>&lt;img&gt;</code> tags</li>
       <li>Normalizes relative links and removes duplicates</li>
       <li>Concurrent <code>HEAD</code> checks in batches (5 parallel requests by default)</li>
       <li>Built-in HTTP HEAD client with TLS and a configurable timeout (15 seconds by default)</li>
