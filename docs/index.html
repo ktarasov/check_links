@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CheckLinks — проверка ссылок на веб-странице</title>
+  <meta name="description" content="CheckLinks — консольная утилита на Zig для проверки ссылок и изображений на веб-странице: конкурентная HEAD-проверка, цветной вывод таблицы, экспорт в CSV.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="index.html"><span class="prompt">$</span> check-links</a>
+    <nav class="lang-switch" aria-label="Языки">
+      <a href="index.html" class="active">ru</a>
+      <a href="en.html">en</a>
+      <a href="es.html">es</a>
+      <a href="fr.html">fr</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <h1>CheckLinks</h1>
+    <p class="subtitle">
+      Консольная утилита на языке <strong>Zig</strong> для проверки ссылок
+      на веб-странице: загружает страницу, собирает все ссылки
+      (<code><a href></code>) и изображения (<code><img src></code>)
+      и проверяет каждый URL на доступность.
+    </p>
+    <a class="btn btn-primary" href="https://github.com/kvt/check-links.zig/releases">Скачать релиз</a>
+    <a class="btn" href="https://github.com/kvt/check-links.zig">GitHub-репозиторий</a>
+  </section>
+
+  <section id="features">
+    <h2>Возможности</h2>
+    <ul class="features">
+      <li>Загрузка страниц по схемам <code>http://</code>, <code>https://</code> и <code>file://</code></li>
+      <li>Извлечение URL из <code>href</code> тегов <code><a></code> и <code>src</code> тегов <code><img></code></li>
+      <li>Нормализация относительных ссылок и удаление дубликатов</li>
+      <li>Конкурентная проверка методом <code>HEAD</code> партиями (по умолчанию 5 параллельных запросов)</li>
+      <li>Собственный HTTP HEAD-клиент с TLS и настраиваемым таймаутом (по умолчанию 15 секунд)</li>
+      <li>Повторяемые пользовательские заголовки для авторизованных страниц</li>
+      <li>Цветная таблица результатов: 2xx — зелёный, 3xx — жёлтый, 4xx/5xx — красный</li>
+      <li>Экспорт результатов в CSV (разделитель <code>;</code>)</li>
+      <li>Режим «только ошибки» (<code>--fail</code>) и индикатор прогресса</li>
+      <li>Интерфейс на русском, английском, испанском или французском языке</li>
+      <li>Генерация скриптов автодополнения для bash, zsh, fish и nushell</li>
+      <li>Адаптивный вывод под ширину терминала (POSIX <code>ioctl</code> / Windows API)</li>
+    </ul>
+  </section>
+
+  <section id="install">
+    <h2>Установка и сборка</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Из исходников</h3>
+        <p>Требуется <strong>Zig 0.17.0</strong> или новее.</p>
+        <pre><code>git clone https://github.com/kvt/check-links.zig
+cd check-links.zig
+zig build</code></pre>
+        <p>Бинарник появится в <code>zig-out/bin/check-links</code>.</p>
+      </div>
+      <div>
+        <h3>Готовые пакеты</h3>
+        <p>На странице
+          <a href="https://github.com/kvt/check-links.zig/releases">Releases</a>
+          доступны:</p>
+        <table>
+          <tr><th>Платформа</th><th>Формат</th></tr>
+          <tr><td>Linux x86_64</td><td><code>.tar.gz</code>, <code>.deb</code>, <code>.rpm</code></td></tr>
+          <tr><td>Windows x86_64</td><td><code>.zip</code></td></tr>
+          <tr><td>macOS x86_64 / aarch64</td><td><code>.tar.gz</code></td></tr>
+        </table>
+        <p class="muted">Пакеты собираются для каждой локали интерфейса (ru, en, es, fr).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="usage">
+    <h2>Использование</h2>
+    <pre><code># Проверить все ссылки на странице и вывести таблицу в терминал
+check-links https://example.com/
+
+# Показать только ошибочные ссылки
+check-links --fail https://example.com/
+
+# Увеличить таймаут и число параллельных запросов
+check-links --timeout 60 --parallels 20 https://example.com/
+
+# Экспортировать результаты в CSV-файл
+check-links --export result.csv https://example.com/</code></pre>
+
+    <h3>Пример вывода</h3>
+    <pre><code> №      | URL страницы            | Проверенный URL            | HTTP Код
+     1. | https://example.com     | https://example.com/page1  |   <span class="code-ok">200</span>
+     2. | https://example.com     | https://example.com/page2  |   <span class="code-ok">200</span>
+     3. | https://example.com     | https://example.com/page3  |   <span class="code-red">302</span>
+     4. | https://example.com     | https://example.com/page4  |   <span class="code-err">404</span></code></pre>
+    <p class="muted">Коды 2xx выводятся зелёным, 3xx — жёлтым, 4xx/5xx — красным.</p>
+  </section>
+
+  <section id="docs">
+    <h2>Документация</h2>
+    <p>
+      Полное описание параметров, типовые сценарии использования и структура
+      проекта — в README:
+    </p>
+    <p>
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.md">Русский</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.en.md">English</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.es.md">Español</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.fr.md">Français</a>
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>© CheckLinks. Лицензия Васлекс для свободного программного обеспечения 2.0.</span>
+    <span><a href="https://github.com/kvt/check-links.zig">github.com/kvt/check-links.zig</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

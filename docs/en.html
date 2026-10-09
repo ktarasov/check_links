@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CheckLinks — link checker for web pages</title>
+  <meta name="description" content="CheckLinks is a Zig CLI utility for checking links and images on a web page: concurrent HEAD checks, colorized table output, CSV export.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a class="brand" href="index.html"><span class="prompt">$</span> check-links</a>
+    <nav class="lang-switch" aria-label="Languages">
+      <a href="index.html">ru</a>
+      <a href="en.html" class="active">en</a>
+      <a href="es.html">es</a>
+      <a href="fr.html">fr</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <h1>CheckLinks</h1>
+    <p class="subtitle">
+      A <strong>Zig</strong> CLI utility for checking links on a web page:
+      it downloads the page, collects all links (<code><a href></code>)
+      and images (<code><img src></code>), and verifies that every URL
+      is reachable.
+    </p>
+    <a class="btn btn-primary" href="https://github.com/kvt/check-links.zig/releases">Download release</a>
+    <a class="btn" href="https://github.com/kvt/check-links.zig">GitHub repository</a>
+  </section>
+
+  <section id="features">
+    <h2>Features</h2>
+    <ul class="features">
+      <li>Loads pages via <code>http://</code>, <code>https://</code> and <code>file://</code></li>
+      <li>Extracts URLs from <code>href</code> of <code><a></code> tags and <code>src</code> of <code><img></code> tags</li>
+      <li>Normalizes relative links and removes duplicates</li>
+      <li>Concurrent <code>HEAD</code> checks in batches (5 parallel requests by default)</li>
+      <li>Built-in HTTP HEAD client with TLS and a configurable timeout (15 seconds by default)</li>
+      <li>Repeatable custom headers for authorized pages</li>
+      <li>Colorized result table: 2xx — green, 3xx — yellow, 4xx/5xx — red</li>
+      <li>CSV export (semicolon separator)</li>
+      <li>Errors-only mode (<code>--fail</code>) and a progress bar</li>
+      <li>Interface in Russian, English, Spanish or French</li>
+      <li>Shell completion scripts for bash, zsh, fish and nushell</li>
+      <li>Terminal-width-aware output (POSIX <code>ioctl</code> / Windows API)</li>
+    </ul>
+  </section>
+
+  <section id="install">
+    <h2>Installation and build</h2>
+    <div class="grid-2">
+      <div>
+        <h3>From source</h3>
+        <p>Requires <strong>Zig 0.17.0</strong> or newer.</p>
+        <pre><code>git clone https://github.com/kvt/check-links.zig
+cd check-links.zig
+zig build</code></pre>
+        <p>The binary will appear at <code>zig-out/bin/check-links</code>.</p>
+      </div>
+      <div>
+        <h3>Prebuilt packages</h3>
+        <p>Available on the
+          <a href="https://github.com/kvt/check-links.zig/releases">Releases</a>
+          page:</p>
+        <table>
+          <tr><th>Platform</th><th>Format</th></tr>
+          <tr><td>Linux x86_64</td><td><code>.tar.gz</code>, <code>.deb</code>, <code>.rpm</code></td></tr>
+          <tr><td>Windows x86_64</td><td><code>.zip</code></td></tr>
+          <tr><td>macOS x86_64 / aarch64</td><td><code>.tar.gz</code></td></tr>
+        </table>
+        <p class="muted">Packages are built for each interface locale (ru, en, es, fr).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="usage">
+    <h2>Usage</h2>
+    <pre><code># Check all links on a page and print a table to the terminal
+check-links https://example.com/
+
+# Show only broken links
+check-links --fail https://example.com/
+
+# Increase the timeout and the number of parallel requests
+check-links --timeout 60 --parallels 20 https://example.com/
+
+# Export results to a CSV file
+check-links --export result.csv https://example.com/</code></pre>
+
+    <h3>Sample output</h3>
+    <pre><code> №      | URL                     | Checked URL                | HTTP Code
+     1. | https://example.com     | https://example.com/page1  |   <span class="code-ok">200</span>
+     2. | https://example.com     | https://example.com/page2  |   <span class="code-ok">200</span>
+     3. | https://example.com     | https://example.com/page3  |   <span class="code-red">302</span>
+     4. | https://example.com     | https://example.com/page4  |   <span class="code-err">404</span></code></pre>
+    <p class="muted">Codes 2xx are shown in green, 3xx in yellow, 4xx/5xx in red.</p>
+  </section>
+
+  <section id="docs">
+    <h2>Documentation</h2>
+    <p>
+      The full list of options, typical usage scenarios and the project
+      structure are described in the README:
+    </p>
+    <p>
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.md">Русский</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.en.md">English</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.es.md">Español</a> ·
+      <a href="https://github.com/kvt/check-links.zig/blob/main/README.fr.md">Français</a>
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>© CheckLinks. Vaslex Free Software License 2.0.</span>
+    <span><a href="https://github.com/kvt/check-links.zig">github.com/kvt/check-links.zig</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

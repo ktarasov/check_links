@@ -1,0 +1,292 @@
+/* CheckLinks — стили сайта проекта (тёмная тема в духе терминала) */
+
+:root {
+  --bg: #0d1117;
+  --bg-alt: #161b22;
+  --bg-code: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #2f81f7;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --max-width: 960px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* --- Шапка --- */
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.site-header .inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.site-header .brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.site-header .brand .prompt {
+  color: var(--green);
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+    Consolas, monospace;
+}
+
+.lang-switch {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.lang-switch a {
+  padding: 0.15rem 0.55rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.lang-switch a:hover {
+  color: var(--text);
+  background: var(--border);
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: var(--bg);
+  background: var(--accent);
+  font-weight: 600;
+}
+
+/* --- Секции --- */
+
+main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+section {
+  padding: 2.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+section:last-of-type {
+  border-bottom: none;
+}
+
+h1 {
+  font-size: 2.2rem;
+  line-height: 1.2;
+  margin-bottom: 0.75rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+p {
+  margin-bottom: 0.9rem;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.hero {
+  padding: 3.5rem 0 3rem;
+}
+
+.hero .subtitle {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  max-width: 46rem;
+}
+
+/* --- Кнопки --- */
+
+.btn {
+  display: inline-block;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  margin: 0.4rem 0.5rem 0.4rem 0;
+  border: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.btn:hover {
+  text-decoration: none;
+  background: var(--bg-alt);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1f6feb;
+}
+
+/* --- Списки возможностей --- */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  list-style: none;
+}
+
+.features li {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+}
+
+.features li::before {
+  content: "▸ ";
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* --- Код и примеры --- */
+
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+    Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 1rem 0;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+    Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--bg-code);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Цвета HTTP-кодов в примере вывода */
+.code-ok   { color: var(--green); }
+.code-red  { color: var(--yellow); }
+.code-err  { color: var(--red); }
+
+/* --- Таблицы --- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+th,
+td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+
+th {
+  background: var(--bg-alt);
+}
+
+/* --- Сетка из двух колонок (установка + платформы) --- */
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 720px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+  }
+}
+
+/* --- Подвал --- */
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-alt);
+  margin-top: 2rem;
+}
+
+.site-footer .inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
